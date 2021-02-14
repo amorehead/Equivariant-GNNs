@@ -4,17 +4,17 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
 from project.datasets.RG.rg_dgl_dataset import RGDGLDataset
-from project.utils.utils import RandomRotation, collate
+from project.utils.utils import collate
 
 
 class RGDGLDataModule(LightningDataModule):
     """Random graph data module for DGL with PyTorch."""
 
-    def __init__(self, data_dir: str, task: str, batch_size=32, num_dataloader_workers=1, seed=42):
+    def __init__(self, node_feature_size=6, edge_feature_size=4, batch_size=4, num_dataloader_workers=4, seed=42):
         super().__init__()
 
-        self.data_dir = data_dir
-        self.task = task
+        self.node_feature_size = node_feature_size
+        self.edge_feature_size = edge_feature_size
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
         self.seed = seed
@@ -34,13 +34,21 @@ class RGDGLDataModule(LightningDataModule):
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU
-        RGDGLDataset(self.data_dir, self.task, mode='train', transform=RandomRotation())
+        self.rg_train = RGDGLDataset(mode='train',
+                                     node_feature_size=self.node_feature_size,
+                                     edge_feature_size=self.edge_feature_size)
 
     def setup(self, stage: Optional[str] = None):
         # Assign training/validation/testing data set for use in DataLoaders - called on every GPU
-        self.rg_train = RGDGLDataset(self.data_dir, self.task, mode='train', transform=RandomRotation())
-        self.rg_val = RGDGLDataset(self.data_dir, self.task, mode='valid')
-        self.rg_test = RGDGLDataset(self.data_dir, self.task, mode='test')
+        self.rg_train = RGDGLDataset(mode='train',
+                                     node_feature_size=self.node_feature_size,
+                                     edge_feature_size=self.edge_feature_size)
+        self.rg_val = RGDGLDataset(mode='val',
+                                   node_feature_size=self.node_feature_size,
+                                   edge_feature_size=self.edge_feature_size)
+        self.rg_test = RGDGLDataset(mode='test',
+                                    node_feature_size=self.node_feature_size,
+                                    edge_feature_size=self.edge_feature_size)
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.rg_train, batch_size=self.batch_size, shuffle=True,

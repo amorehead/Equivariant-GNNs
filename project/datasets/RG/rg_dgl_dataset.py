@@ -1,12 +1,13 @@
 import dgl
 import numpy as np
 import torch
-from dgl import Dataset
+from torch.utils.data import Dataset
 
 
 class RGDGLDataset(Dataset):
-    def __init__(self, num_nodes=20, num_edges=10, node_feature_size=6, edge_feature_size=4,
+    def __init__(self, mode='train', num_nodes=20, num_edges=10, node_feature_size=6, edge_feature_size=4,
                  size=300, dtype=np.float32):
+        assert mode in ['train', 'val', 'test']
         self.num_nodes = num_nodes
         self.num_edges = num_edges
         self.size = size

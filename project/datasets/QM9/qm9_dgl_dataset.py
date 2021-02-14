@@ -29,6 +29,7 @@ class QM9DGLDataset(Dataset):
             transform: data augmentation functions
             fully_connected: return a fully connected graph
         """
+        assert mode in ['train', 'val', 'test']
         self.file_address = file_address
         self.task = task
         self.mode = mode

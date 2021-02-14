@@ -1,14 +1,15 @@
 import os
 
 import pytorch_lightning as pl
-from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
-from project.utils.fibers import Fiber
-from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r, task_loss, construct_wandb_pl_logger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+
+from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
+from project.utils.fibers import Fiber
+from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
+from project.utils.utils import collect_args, process_args, get_basis_and_r, task_loss, construct_wandb_pl_logger
 
 
 class LitRGSET(pl.LightningModule):
@@ -16,8 +17,7 @@ class LitRGSET(pl.LightningModule):
 
     def __init__(self, num_layers: int, atom_feature_size: int, num_channels: int, num_nlayers: int = 1,
                  num_degrees: int = 4, edge_dim: int = 4, div: float = 4, pooling: str = 'avg', n_heads: int = 1,
-                 geometric: bool = True, lr: float = 1e-3, num_epochs: int = 5, std: float = 1.0, mean: float = 0.0,
-                 task: str = 'homo'):
+                 geometric: bool = True, lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for a RGSET."""
         super().__init__()
         self.save_hyperparameters()
@@ -34,11 +34,6 @@ class LitRGSET(pl.LightningModule):
         self.geometric = geometric
         self.lr = lr
         self.num_epochs = num_epochs
-
-        # Capture dataset specific parameters for loss measurement
-        self.std = std
-        self.mean = mean
-        self.task = task
 
         # Assemble the layers of the network
         self.fibers = {'in': Fiber(1, atom_feature_size),
@@ -77,28 +72,20 @@ class LitRGSET(pl.LightningModule):
     # ---------------------
     # Training
     # ---------------------
-    def gcn_forward(self, G):
-        """Make a forward pass through a single GCN."""
+    def forward(self, graph):
+        """Make a forward pass through the entire network."""
         # Compute equivariant weight basis from relative positions
-        basis, r = get_basis_and_r(G, self.num_degrees - 1)
+        basis, r = get_basis_and_r(graph, self.num_degrees - 1)
 
         # Encoder (equivariant layers)
-        h = {'0': G.ndata['f']}
+        h = {'0': graph.ndata['f']}
         for layer in self.Gblock:
-            h = layer(h, G=G, r=r, basis=basis)
+            h = layer(h, G=graph, r=r, basis=basis)
 
         for layer in self.FCblock:
             h = layer(h)
 
         return h
-
-    def forward(self, graph):
-        """Make a forward pass through the entire network."""
-        # Forward propagate with GCN
-        logits = self.gcn_forward(graph)
-
-        # Return network prediction
-        return logits
 
     def training_step(self, graph_and_y, batch_idx):
         """Lightning calls this inside the training loop."""
@@ -109,11 +96,11 @@ class LitRGSET(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        l1_loss, _, rescale_loss = self.loss(logits, y, self.std, self.mean, self.task)
+        l1_loss, l2_loss = self.loss(logits, y)
 
         # Log training metrics
         self.log('train_l1_loss', l1_loss)
-        self.log('train_rescale_loss', rescale_loss)
+        self.log('train_l2_loss', l2_loss)
 
         # Assemble and return the training step output
         output = {'loss': l1_loss}  # The loss key here is required
@@ -128,13 +115,14 @@ class LitRGSET(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        _, _, rescale_loss = self.loss(logits, y, self.std, self.mean, self.task)
+        l1_loss, l2_loss = self.loss(logits, y)
 
         # Log training metrics
-        self.log('val_rescale_loss', rescale_loss)
+        self.log('val_l1_loss', l1_loss)
+        self.log('val_l2_loss', l2_loss)
 
         # Assemble and return the training step output
-        output = {'loss': rescale_loss}  # The loss key here is required
+        output = {'loss': l1_loss}  # The loss key here is required
         return output
 
     def test_step(self, graph_and_y, batch_idx):
@@ -146,13 +134,14 @@ class LitRGSET(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        _, _, rescale_loss = self.loss(logits, y, self.std, self.mean, self.task)
+        l1_loss, l2_loss = self.loss(logits, y)
 
         # Log training metrics
-        self.log('test_rescale_loss', rescale_loss)
+        self.log('test_l1_loss', l1_loss)
+        self.log('test_l2_loss', l2_loss)
 
         # Assemble and return the training step output
-        output = {'loss': rescale_loss}  # The loss key here is required
+        output = {'loss': l1_loss}  # The loss key here is required
         return output
 
     # ---------------------
@@ -186,31 +175,28 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    qm9_data_module = QM9DGLDataModule(data_dir=args.data_dir,
-                                       task=args.task,
-                                       batch_size=args.batch_size,
-                                       num_dataloader_workers=args.num_workers,
-                                       seed=args.seed)
-    qm9_data_module.setup()
-    qm9_data_module.prepare_data()
+    rg_data_module = RGDGLDataModule(node_feature_size=args.node_feature_size,
+                                     edge_feature_size=args.edge_feature_size,
+                                     batch_size=args.batch_size,
+                                     num_dataloader_workers=args.num_workers,
+                                     seed=args.seed)
+    rg_data_module.setup()
+    rg_data_module.prepare_data()
 
     # -----------
     # Model
     # -----------
     lit_rgset = LitRGSET(num_layers=args.num_layers,
-                         atom_feature_size=qm9_data_module.num_atom_features,
+                         atom_feature_size=rg_data_module.num_atom_features,
                          num_channels=args.num_channels,
                          num_nlayers=args.num_nlayers,
                          num_degrees=args.num_degrees,
-                         edge_dim=qm9_data_module.num_bonds,
+                         edge_dim=rg_data_module.num_bonds,
                          div=args.div,
                          pooling=args.pooling,
                          n_heads=args.head,
                          geometric=args.geometric,
-                         lr=args.lr,
-                         std=qm9_data_module.qm9_train.std,
-                         mean=qm9_data_module.qm9_train.mean,
-                         task=args.task)
+                         lr=args.lr)
 
     # ------------
     # Checkpoint
@@ -226,14 +212,14 @@ def cli_main():
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    checkpoint_callback = ModelCheckpoint(monitor='val_auroc_score', save_top_k=1)
+    checkpoint_callback = ModelCheckpoint(monitor='val_l1_loss', save_top_k=1)
     trainer.callbacks = [checkpoint_callback]
 
     # Logging all args to wandb
     logger = construct_wandb_pl_logger(args)
     trainer.logger = logger
 
-    trainer.fit(lit_rgset, datamodule=qm9_data_module)
+    trainer.fit(lit_rgset, datamodule=rg_data_module)
 
     # -----------
     # Testing

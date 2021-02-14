@@ -39,7 +39,7 @@ class QM9DGLDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         # Assign training/validation/testing data set for use in DataLoaders - called on every GPU
         self.qm9_train = QM9DGLDataset(self.data_dir, self.task, mode='train', transform=RandomRotation())
-        self.qm9_val = QM9DGLDataset(self.data_dir, self.task, mode='valid')
+        self.qm9_val = QM9DGLDataset(self.data_dir, self.task, mode='val')
         self.qm9_test = QM9DGLDataset(self.data_dir, self.task, mode='test')
 
     def train_dataloader(self) -> DataLoader:
