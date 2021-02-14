@@ -25,12 +25,12 @@ class RGDGLDataModule(LightningDataModule):
         self.rg_test = None
 
     @property
-    def num_atom_features(self) -> int:
-        return self.rg_train.num_atom_features
+    def num_node_features(self) -> int:
+        return self.rg_train.edge_feature_size
 
     @property
-    def num_bonds(self) -> int:
-        return self.rg_train.num_bonds
+    def num_edge_features(self) -> int:
+        return self.rg_train.edge_feature_size
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU

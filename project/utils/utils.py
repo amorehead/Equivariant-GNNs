@@ -129,17 +129,8 @@ def collate(samples):
     return batched_graph, torch.tensor(y)
 
 
-def task_loss(pred, target, use_mean=True):
-    l1_loss = torch.sum(torch.abs(pred - target))
-    l2_loss = torch.sum((pred - target) ** 2)
-    if use_mean:
-        l1_loss /= pred.shape[0]
-        l2_loss /= pred.shape[0]
-    return l1_loss, l2_loss
-
-
 # -------------------------------------------------------------------------------------------------------------------------------------
-# Following code curated for SGSET (https://github.com/jianlin-cheng/DeepInteract):
+# Following code curated for RGSET (https://github.com/amorehead/RGSET):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -171,10 +162,10 @@ def collect_args():
     # -----------------
     # Data parameters
     # -----------------
-    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
-                        help='Path to preprocessed QM9 dataset')
-    parser.add_argument('--task', type=str, default='homo',
-                        help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
+    # parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
+    #                     help='Path to preprocessed QM9 dataset')
+    # parser.add_argument('--task', type=str, default='homo',
+    #                     help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
     parser.add_argument('--node_feature_size', type=int, default=6, help='Number of features per random graph node')
     parser.add_argument('--edge_feature_size', type=int, default=4, help='Number of features per random graph edge')
 
@@ -186,7 +177,7 @@ def collect_args():
     parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
     parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
     parser.add_argument('--save_dir', type=str, default="models", help="Directory name to save models")
-    parser.add_argument('--wandb', type=str, default='DeepInteract', help="WandB project name")
+    parser.add_argument('--wandb', type=str, default='RGSET', help="WandB project name")
 
     # -----------------
     # Miscellaneous

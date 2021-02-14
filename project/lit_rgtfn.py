@@ -2,6 +2,7 @@ import os
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.metrics import MeanSquaredError
 from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
@@ -9,7 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.modules import GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r, task_loss, construct_wandb_pl_logger
+from project.utils.utils import collect_args, process_args, get_basis_and_r
 
 
 class LitRGTFN(pl.LightningModule):
@@ -34,8 +35,8 @@ class LitRGTFN(pl.LightningModule):
         blocks = self._build_gcn(self.fibers, 1)
         self.block0, self.block1, self.block2 = blocks
 
-        # Declare loss function for training, validation, and testing
-        self.loss = task_loss
+        # Declare loss function(s) for training, validation, and testing
+        self.loss = MeanSquaredError()
 
     def _build_gcn(self, fibers, out_dim):
         block0 = []
@@ -82,14 +83,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        l1_loss, l2_loss = self.loss(logits, y)
+        mse = self.loss(logits, y)
 
         # Log training metrics
-        self.log('train_l1_loss', l1_loss)
-        self.log('train_l2_loss', l2_loss)
+        self.log('train_mse', mse)
 
         # Assemble and return the training step output
-        output = {'loss': l1_loss}  # The loss key here is required
+        output = {'loss': mse}  # The loss key here is required
         return output
 
     def validation_step(self, graph_and_y, batch_idx):
@@ -101,14 +101,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        l1_loss, l2_loss = self.loss(logits, y)
+        mse = self.loss(logits, y)
 
-        # Log training metrics
-        self.log('val_l1_loss', l1_loss)
-        self.log('val_l2_loss', l2_loss)
+        # Log validation metrics
+        self.log('val_mse', mse)
 
-        # Assemble and return the training step output
-        output = {'loss': l1_loss}  # The loss key here is required
+        # Assemble and return the validation step output
+        output = {'loss': mse}  # The loss key here is required
         return output
 
     def test_step(self, graph_and_y, batch_idx):
@@ -120,14 +119,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        l1_loss, l2_loss = self.loss(logits, y)
+        mse = self.loss(logits, y)
 
-        # Log training metrics
-        self.log('test_l1_loss', l1_loss)
-        self.log('test_l2_loss', l2_loss)
+        # Log test metrics
+        self.log('test_mse', mse)
 
-        # Assemble and return the training step output
-        output = {'loss': l1_loss}  # The loss key here is required
+        # Assemble and return the test step output
+        output = {'loss': mse}  # The loss key here is required
         return output
 
     # ---------------------
@@ -137,7 +135,7 @@ class LitRGTFN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.hparams.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'val_loss'
+        metric_to_track = 'val_mse'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -173,15 +171,14 @@ def cli_main():
     # Model
     # -----------
     lit_rgtfn = LitRGTFN(num_layers=args.num_layers,
-                         atom_feature_size=rg_data_module.num_atom_features,
+                         atom_feature_size=rg_data_module.num_node_features,
                          num_channels=args.num_channels,
                          num_nlayers=args.num_nlayers,
                          num_degrees=args.num_degrees,
-                         edge_dim=rg_data_module.num_bonds,
+                         edge_dim=rg_data_module.num_edge_features,
                          div=args.div,
                          pooling=args.pooling,
                          n_heads=args.head,
-                         geometric=args.geometric,
                          lr=args.lr)
 
     # ------------
@@ -198,12 +195,12 @@ def cli_main():
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    checkpoint_callback = ModelCheckpoint(monitor='val_l1_loss', save_top_k=1)
+    checkpoint_callback = ModelCheckpoint(monitor='val_mse', save_top_k=1)
     trainer.callbacks = [checkpoint_callback]
 
     # Logging all args to wandb
-    logger = construct_wandb_pl_logger(args)
-    trainer.logger = logger
+    # logger = construct_wandb_pl_logger(args)
+    # trainer.logger = logger
 
     trainer.fit(lit_rgtfn, datamodule=rg_data_module)
 
