@@ -18,8 +18,10 @@ class LitRGTFN(pl.LightningModule):
 
     def __init__(self, num_layers: int, atom_feature_size: int,
                  num_channels: int, num_nlayers: int = 1, num_degrees: int = 4,
-                 edge_dim: int = 4, **kwargs):
+                 edge_dim: int = 4, lr: float = 1e-3, num_epochs: int = 5, **kwargs):
         super().__init__()
+        self.save_hyperparameters()
+
         # Build the network
         self.num_layers = num_layers
         self.num_nlayers = num_nlayers
@@ -27,6 +29,8 @@ class LitRGTFN(pl.LightningModule):
         self.num_degrees = num_degrees
         self.num_channels_out = num_channels * num_degrees
         self.edge_dim = edge_dim
+        self.lr = lr
+        self.num_epochs = num_epochs
 
         self.fibers = {'in': Fiber(1, atom_feature_size),
                        'mid': Fiber(num_degrees, self.num_channels),
@@ -64,12 +68,15 @@ class LitRGTFN(pl.LightningModule):
         # Compute equivariant weight basis from relative positions
         basis, r = get_basis_and_r(graph, self.num_degrees - 1)
 
-        # Encoder (equivariant layers)
+        # encoder (equivariant layers)
         h = {'0': graph.ndata['f']}
-        for layer in self.Gblock:
+        for layer in self.block0:
             h = layer(h, G=graph, r=r, basis=basis)
 
-        for layer in self.FCblock:
+        for layer in self.block1:
+            h = layer(h, graph)
+
+        for layer in self.block2:
             h = layer(h)
 
         return h
@@ -133,7 +140,7 @@ class LitRGTFN(pl.LightningModule):
     # ---------------------
     def configure_optimizers(self):
         """Called to configure the trainer's optimizer(s)."""
-        optimizer = Adam(self.parameters(), lr=self.hparams.lr)
+        optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
         metric_to_track = 'val_mse'
         return {
@@ -176,10 +183,8 @@ def cli_main():
                          num_nlayers=args.num_nlayers,
                          num_degrees=args.num_degrees,
                          edge_dim=rg_data_module.num_edge_features,
-                         div=args.div,
-                         pooling=args.pooling,
-                         n_heads=args.head,
-                         lr=args.lr)
+                         lr=args.lr,
+                         num_epochs=args.num_epochs)
 
     # ------------
     # Checkpoint

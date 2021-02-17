@@ -18,7 +18,7 @@ class LitRGSET(pl.LightningModule):
 
     def __init__(self, num_layers: int, atom_feature_size: int, num_channels: int, num_nlayers: int = 1,
                  num_degrees: int = 4, edge_dim: int = 4, div: float = 4, pooling: str = 'avg', n_heads: int = 1,
-                 geometric: bool = True, lr: float = 1e-3, num_epochs: int = 5):
+                 lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for a RGSET."""
         super().__init__()
         self.save_hyperparameters()
@@ -32,7 +32,6 @@ class LitRGSET(pl.LightningModule):
         self.div = div
         self.pooling = pooling
         self.n_heads = n_heads
-        self.geometric = geometric
         self.lr = lr
         self.num_epochs = num_epochs
 
@@ -193,7 +192,8 @@ def cli_main():
                          div=args.div,
                          pooling=args.pooling,
                          n_heads=args.head,
-                         lr=args.lr)
+                         lr=args.lr,
+                         num_epochs=args.num_epochs)
 
     # ------------
     # Checkpoint
