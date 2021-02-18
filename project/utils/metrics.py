@@ -10,8 +10,12 @@ class L1L2Loss(Metric):
         self.add_state("l1_loss", default=torch.tensor(1), dist_reduce_fx="mean")
         self.add_state("l2_loss", default=torch.tensor(1), dist_reduce_fx="mean")
 
+    def _input_format(self, preds, target):
+        return torch.squeeze(preds), torch.squeeze(target)
+
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        # assert preds.shape == target.shape
+        preds, target = self._input_format(preds, target)
+        assert preds.shape == target.shape
 
         self.l1_loss = torch.sum(torch.abs(preds - target))
         self.l2_loss = torch.sum((preds - target) ** 2)

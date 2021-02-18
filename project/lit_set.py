@@ -214,6 +214,7 @@ def cli_main():
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
+    trainer.max_epochs = args.num_epochs
 
     # Logging all args to wandb
     logger = construct_wandb_pl_logger(args)
