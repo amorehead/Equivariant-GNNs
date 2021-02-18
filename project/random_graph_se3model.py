@@ -32,7 +32,7 @@ pooling = 'max'
 print_interval = 250
 profile = False
 restore = None
-save_dir = '/home/chen/test.pt'
+save_dir = '~/test_model.pt'
 seed = 1992
 task = 'homo'
 
