@@ -1,20 +1,20 @@
 import os
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.metrics import MeanSquaredError
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.fibers import Fiber
+from project.utils.metrics import L1L2Loss
 from project.utils.modules import GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r
+from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_wandb_pl_logger
 
 
-class LitRGTFN(pl.LightningModule):
-    """An SE(3)-equivariant GCN for random graphs."""
+class LitTFN(pl.LightningModule):
+    """An SE(3)-equivariant GCN."""
 
     def __init__(self, num_layers: int, atom_feature_size: int,
                  num_channels: int, num_nlayers: int = 1, num_degrees: int = 4,
@@ -40,7 +40,7 @@ class LitRGTFN(pl.LightningModule):
         self.block0, self.block1, self.block2 = blocks
 
         # Declare loss function(s) for training, validation, and testing
-        self.loss = MeanSquaredError()
+        self.L1L2Loss = L1L2Loss()
 
     def _build_gcn(self, fibers, out_dim):
         block0 = []
@@ -90,13 +90,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        mse = self.loss(logits, y)
+        l1_loss, l2_loss = self.L1L2Loss(logits, y)
 
         # Log training metrics
-        self.log('train_mse', mse)
+        self.log('train_l1_loss', l1_loss)
 
         # Assemble and return the training step output
-        output = {'loss': mse}  # The loss key here is required
+        output = {'loss': l1_loss}  # The loss key here is required
         return output
 
     def validation_step(self, graph_and_y, batch_idx):
@@ -108,13 +108,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        mse = self.loss(logits, y)
+        l1_loss, l2_loss = self.L1L2Loss(logits, y)
 
         # Log validation metrics
-        self.log('val_mse', mse)
+        self.log('val_l1_loss', l1_loss)
 
         # Assemble and return the validation step output
-        output = {'loss': mse}  # The loss key here is required
+        output = {'loss': l1_loss}  # The loss key here is required
         return output
 
     def test_step(self, graph_and_y, batch_idx):
@@ -126,13 +126,13 @@ class LitRGTFN(pl.LightningModule):
         logits = self.forward(graph)
 
         # Calculate the loss
-        mse = self.loss(logits, y)
+        l1_loss, l2_loss = self.L1L2Loss(logits, y)
 
         # Log test metrics
-        self.log('test_mse', mse)
+        self.log('test_l1_loss', l1_loss)
 
         # Assemble and return the test step output
-        output = {'loss': mse}  # The loss key here is required
+        output = {'loss': l1_loss}  # The loss key here is required
         return output
 
     # ---------------------
@@ -142,12 +142,17 @@ class LitRGTFN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'val_mse'
+        metric_to_track = 'val_l1_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
             'monitor': metric_to_track
         }
+
+    def configure_callbacks(self):
+        early_stop = EarlyStopping(monitor="val_l1_loss", mode="max")
+        checkpoint = ModelCheckpoint(monitor="val_l1_loss", save_top_k=1)
+        return [early_stop, checkpoint]
 
 
 def cli_main():
@@ -166,32 +171,32 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    rg_data_module = RGDGLDataModule(node_feature_size=args.node_feature_size,
-                                     edge_feature_size=args.edge_feature_size,
-                                     batch_size=args.batch_size,
-                                     num_dataloader_workers=args.num_workers,
-                                     seed=args.seed)
-    rg_data_module.setup()
-    rg_data_module.prepare_data()
+    data_module = RGDGLDataModule(node_feature_size=args.node_feature_size,
+                                  edge_feature_size=args.edge_feature_size,
+                                  batch_size=args.batch_size,
+                                  num_dataloader_workers=args.num_workers,
+                                  seed=args.seed)
+    data_module.setup()
+    data_module.prepare_data()
 
     # -----------
     # Model
     # -----------
-    lit_rgtfn = LitRGTFN(num_layers=args.num_layers,
-                         atom_feature_size=rg_data_module.num_node_features,
-                         num_channels=args.num_channels,
-                         num_nlayers=args.num_nlayers,
-                         num_degrees=args.num_degrees,
-                         edge_dim=rg_data_module.num_edge_features,
-                         lr=args.lr,
-                         num_epochs=args.num_epochs)
+    lit_tfn = LitTFN(num_layers=args.num_layers,
+                     atom_feature_size=args.num_node_features,
+                     num_channels=args.num_channels,
+                     num_nlayers=args.num_nlayers,
+                     num_degrees=args.num_degrees,
+                     edge_dim=args.num_edge_features,
+                     lr=args.lr,
+                     num_epochs=args.num_epochs)
 
     # ------------
     # Checkpoint
     # ------------
     checkpoint_save_path = os.path.join(args.save_dir, f'{args.name}.pth')
     try:
-        lit_rgtfn = LitRGTFN.load_from_checkpoint(f'{args.name}.pth')
+        lit_tfn = LitTFN.load_from_checkpoint(f'{args.name}.pth')
         print(f'Resuming from checkpoint {checkpoint_save_path}\n')
     except:
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
@@ -200,20 +205,18 @@ def cli_main():
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    checkpoint_callback = ModelCheckpoint(monitor='val_mse', save_top_k=1)
-    trainer.callbacks = [checkpoint_callback]
 
     # Logging all args to wandb
-    # logger = construct_wandb_pl_logger(args)
-    # trainer.logger = logger
+    logger = construct_wandb_pl_logger(args)
+    trainer.logger = logger
 
-    trainer.fit(lit_rgtfn, datamodule=rg_data_module)
+    trainer.fit(lit_tfn, datamodule=data_module)
 
     # -----------
     # Testing
     # -----------
     rg_test_results = trainer.test()
-    print(f'Model testing results on RG dataset: {rg_test_results}\n')
+    print(f'Model testing results on dataset: {rg_test_results}\n')
 
     # ------------
     # Finalizing

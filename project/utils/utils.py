@@ -51,16 +51,16 @@ class RandomRotation(object):
 
 # Equivariant basis construction #
 @profile
-def get_basis(Y, max_degree):
+def get_basis(Y, max_degree, device):
     """Precompute the SE(3)-equivariant weight basis.
     This is called by get_basis_and_r().
     Args:
         Y: spherical harmonic dict, returned by utils_steerable.precompute_sh()
         max_degree: non-negative int for degree of highest feature type
+        device: Torch device for which basis is constructed
     Returns:
         dict of equivariant bases, keys are in form '<d_in><d_out>'
     """
-    device = Y[0].device
     # No need to backprop through the basis construction
     with torch.no_grad():
         basis = {}
@@ -82,7 +82,7 @@ def get_basis(Y, max_degree):
         return basis
 
 
-def get_basis_and_r(G, max_degree):
+def get_basis_and_r(G, max_degree, device):
     """Return equivariant weight basis (basis) and internodal distances (r).
     Call this function *once* at the start of each forward pass of the model.
     It computes the equivariant weight basis, W_J^lk(x), and internodal
@@ -92,6 +92,7 @@ def get_basis_and_r(G, max_degree):
     Args:
         G: DGL graph instance of type dgl.DGLGraph()
         max_degree: non-negative int for degree of highest feature-type
+        device: Torch device for which basis is constructed
     Returns:
         dict of equivariant bases, keys are in form '<d_in><d_out>'
         vector of relative distances, ordered according to edge ordering of G
@@ -101,7 +102,7 @@ def get_basis_and_r(G, max_degree):
     # Spherical harmonic basis
     Y = precompute_sh(r_ij, 2 * max_degree)
     # Equivariant basis (dict['d_in><d_out>'])
-    basis = get_basis(Y, max_degree)
+    basis = get_basis(Y, max_degree, device)
     # Relative distances (scalar)
     r = torch.sqrt(torch.sum(G.edata['d'] ** 2, -1, keepdim=True))
     return basis, r
@@ -127,6 +128,13 @@ def collate(samples):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     return batched_graph, torch.tensor(y)
+
+
+def rand_rot(x, dtype=np.float32):
+    s = np.random.randn(3, 3)
+    r, __ = np.linalg.qr(s)
+    r = r.astype(dtype)
+    return x @ r
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------
@@ -166,8 +174,10 @@ def collect_args():
     #                     help='Path to preprocessed QM9 dataset')
     # parser.add_argument('--task', type=str, default='homo',
     #                     help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
-    parser.add_argument('--node_feature_size', type=int, default=6, help='Number of features per random graph node')
-    parser.add_argument('--edge_feature_size', type=int, default=4, help='Number of features per random graph edge')
+    # parser.add_argument('--node_feature_size', type=int, default=6, help='Number of features per random graph node')
+    # parser.add_argument('--edge_feature_size', type=int, default=4, help='Number of features per random graph edge')
+    parser.add_argument('--node_feature_size', type=int, default=1, help='Number of features per tetris block node')
+    parser.add_argument('--edge_feature_size', type=int, default=1, help='Number of features per tetris block edge')
 
     # -----------------
     # Logging
@@ -200,7 +210,9 @@ def process_args(args, unparsed_argv):
     # Name fixing
     # ---------------------------------------
     if not args.name:
+        # args.name = f'RGTFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
         args.name = f'RGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        # args.name = f'TetrisSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
 
     # ---------------------------------------
     # Model directory creation
@@ -227,3 +239,35 @@ def process_args(args, unparsed_argv):
 def construct_wandb_pl_logger(args):
     """Return an instance of WandbLogger with corresponding project and name strings."""
     return WandbLogger(name=args.name, project=args.wandb) if args.name else WandbLogger(project=f'{args.wandb}')
+
+
+def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
+    # src, dst : indices for vertices of source and destination, np.array
+    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
+    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
+    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
+    if num_nodes:
+        G = dgl.graph((src, dst), num_nodes=num_nodes)
+    else:
+        G = dgl.graph((src, dst))
+    if undirected:
+        G = dgl.to_bidirected(G)
+    # Add node features to graph
+    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
+    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
+    # Add edge features to graph
+    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
+    return G
+
+
+def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
+    # pos :n by 3 np.array for xyz
+    x = np.array(range(pos.shape[0]))
+    src = np.repeat(x, x.shape[0])
+    dst = np.tile(x, x.shape[0])
+    flag = src != dst
+    G = dgl.graph((src[flag], dst[flag]))
+    G.ndata['x'] = pos
+    G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
+    G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
+    return G

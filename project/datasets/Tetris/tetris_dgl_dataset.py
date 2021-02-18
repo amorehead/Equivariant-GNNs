@@ -1,39 +1,8 @@
-import dgl
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-
-def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
-    # src, dst : indices for vertices of source and destination, np.array
-    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
-    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
-    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
-    if num_nodes:
-        G = dgl.graph((src, dst), num_nodes=num_nodes)
-    else:
-        G = dgl.graph((src, dst))
-    if undirected:
-        G = dgl.to_bidirected(G)
-    # Add node features to graph
-    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
-    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
-    # Add edge features to graph
-    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
-    return G
-
-
-def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
-    # pos :n by 3 np.array for xyz
-    x = np.array(range(pos.shape[0]))
-    src = np.repeat(x, x.shape[0])
-    dst = np.tile(x, x.shape[0])
-    flag = src != dst
-    G = dgl.graph((src[flag], dst[flag]))
-    G.ndata['x'] = pos
-    G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
-    G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
-    return G
+from project.utils.utils import rand_rot, get_fully_connected_graph
 
 
 def tetris(rand=False, fill=0, dtype=np.float32):
@@ -56,7 +25,10 @@ def tetris(rand=False, fill=0, dtype=np.float32):
     return g_list, label
 
 
-class TDataset(Dataset):
+class TetrisDGLDataset(Dataset):
+    node_feature_size = 1
+    edge_feature_size = 1
+
     def __init__(self, transform=None, fill=0, dtype=np.float32):
         g_list, label = tetris(fill=fill, dtype=dtype)
         self.g_list = g_list

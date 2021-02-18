@@ -1,25 +1,9 @@
 import dgl
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 
-def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
-    # src, dst : indices for vertices of source and destination, np.array
-    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
-    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
-    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
-    if num_nodes:
-        G = dgl.graph((src, dst), num_nodes=num_nodes)
-    else:
-        G = dgl.graph((src, dst))
-    if undirected:
-        G = dgl.to_bidirected(G)
-    # Add node features to graph
-    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
-    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
-    # Add edge features to graph
-    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
-    return G
+from project.utils.utils import get_graph
+
 
 def get_rgraph(num_node, num_edge, node_feature_size, edge_feature_size, dtype):
     G = dgl.rand_graph(num_node, num_edge)
@@ -31,6 +15,7 @@ def get_rgraph(num_node, num_edge, node_feature_size, edge_feature_size, dtype):
     # Add edge features to graph
     edge_feature = np.random.random((num_edge, edge_feature_size))  # [num_atoms,edge_feature_size]
     return get_graph(src, dst, pos, node_feature, edge_feature, dtype, False, num_nodes=num_node)
+
 
 class RGDGLDataset(Dataset):
     def __init__(self, n_lb=10, n_hb=20, e_lb=10, e_hb=15, node_feature_size=6, edge_feature_size=4,
@@ -50,7 +35,7 @@ class RGDGLDataset(Dataset):
     def __getitem__(self, idx):
         g_idx = self.g_list[idx]
         if self.transform:
-            new_pos = self.transform(g_idx.ndata['x'])
-            g_idx.ndata['x'] = torch.tensor(new_pos.astype(self.dtype))
+            new_pos = self.transform(g_idx.ndata['x'], dtype=self.dtype)
+            g_idx.ndata['x'] = new_pos
         g_idx.edata['d'] = g_idx.ndata['x'][g_idx.edges()[1], :] - g_idx.ndata['x'][g_idx.edges()[0], :]
         return g_idx, self.y[[idx], :]
