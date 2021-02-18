@@ -171,9 +171,7 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    data_module = RGDGLDataModule(node_feature_size=args.node_feature_size,
-                                  edge_feature_size=args.edge_feature_size,
-                                  batch_size=args.batch_size,
+    data_module = RGDGLDataModule(batch_size=args.batch_size,
                                   num_dataloader_workers=args.num_workers,
                                   seed=args.seed)
     data_module.setup()

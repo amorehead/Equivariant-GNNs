@@ -19,6 +19,7 @@ class TetrisDGLDataModule(LightningDataModule):
         self.fill = fill
         self.dtype = dtype
 
+        # Dataset meta-parameters
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
         self.seed = seed
@@ -30,11 +31,11 @@ class TetrisDGLDataModule(LightningDataModule):
 
     @property
     def num_node_features(self) -> int:
-        return self.tetris_train.node_feature_size
+        return 1
 
     @property
     def num_edge_features(self) -> int:
-        return self.tetris_train.edge_feature_size
+        return 1
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU

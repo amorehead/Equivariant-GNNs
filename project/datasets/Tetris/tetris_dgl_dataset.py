@@ -26,15 +26,16 @@ def tetris(rand=False, fill=0, dtype=np.float32):
 
 
 class TetrisDGLDataset(Dataset):
-    node_feature_size = 1
-    edge_feature_size = 1
-
     def __init__(self, transform=None, fill=0, dtype=np.float32):
-        g_list, label = tetris(fill=fill, dtype=dtype)
-        self.g_list = g_list
-        self.y = label.astype(dtype)
+        # Provided dataset parameters
         self.transform = transform
+        self.fill = fill
         self.dtype = dtype
+
+        # Generated dataset properties
+        g_list, label = tetris(fill=self.fill, dtype=self.dtype)
+        self.g_list = g_list
+        self.y = label.astype(self.dtype)
 
     def __len__(self):
         return self.y.shape[0]

@@ -162,7 +162,7 @@ def collect_args():
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
+    parser.add_argument('--batch_size', type=int, default=64, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=10, help="Number of epochs")
@@ -170,14 +170,10 @@ def collect_args():
     # -----------------
     # Data parameters
     # -----------------
-    # parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
-    #                     help='Path to preprocessed QM9 dataset')
-    # parser.add_argument('--task', type=str, default='homo',
-    #                     help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
-    # parser.add_argument('--node_feature_size', type=int, default=6, help='Number of features per random graph node')
-    # parser.add_argument('--edge_feature_size', type=int, default=4, help='Number of features per random graph edge')
-    parser.add_argument('--node_feature_size', type=int, default=1, help='Number of features per tetris block node')
-    parser.add_argument('--edge_feature_size', type=int, default=1, help='Number of features per tetris block edge')
+    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
+                        help='Path to preprocessed QM9 dataset')
+    parser.add_argument('--task', type=str, default='homo',
+                        help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
 
     # -----------------
     # Logging
@@ -192,7 +188,7 @@ def collect_args():
     # -----------------
     # Miscellaneous
     # -----------------
-    parser.add_argument('--num_workers', type=int, default=4, help="Number of data loader workers")
+    parser.add_argument('--num_workers', type=int, default=24, help="Number of data loader workers")
     parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
 
     # -----------------
