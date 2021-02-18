@@ -137,6 +137,17 @@ def rand_rot(x, dtype=np.float32):
     return x @ r
 
 
+def norm2units(x, std, mean, task, denormalize=True, center=True):
+    # Convert from normalized to QM9 representation
+    if denormalize:
+        x = x * std
+        # Add the mean: not necessary for error computations
+        if not center:
+            x += mean
+    x = unit_conversion[task] * x
+    return x
+
+
 # -------------------------------------------------------------------------------------------------------------------------------------
 # Following code curated for RGSET (https://github.com/amorehead/RGSET):
 # -------------------------------------------------------------------------------------------------------------------------------------
@@ -162,7 +173,7 @@ def collect_args():
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--batch_size', type=int, default=64, help="Batch size")
+    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=10, help="Number of epochs")
