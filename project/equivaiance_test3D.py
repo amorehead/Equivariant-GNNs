@@ -24,28 +24,33 @@ def cart2sph(x, y, z):
     return r, elev, az
 
 
-def get_spherical_harmonics(x, l, m):
+def get_real_spherical_harmonics(x, l, m):
     _, po, az = cart2sph(x[0], x[1], x[2])
-    return sph_harm(l, m, az, po)
+    Y = sph_harm(abs(m), l, az, po)
+    if m < 0:
+        Y = np.sqrt(2) * (-1)**m * Y.imag
+    elif m > 0:
+        Y = np.sqrt(2) * (-1)**m * Y.real
+    else:
+        Y = Y.real
+    return Y
 
 
 def get_kernel_weights(x, k, l, alpha=1, beta=0.5):
-    w_re = w_img = np.zeros((2 * l + 1, 2 * k + 1))
+    w = np.zeros((2 * l + 1, 2 * k + 1))
     for J in range(np.abs(k - l), k + l + 1):
-        QY_re = QY_img = np.zeros((2 * l + 1, 2 * k + 1))
+        QY = np.zeros((2 * l + 1, 2 * k + 1))
         for m in range(-J, J + 1):
             Q_lk_transpose = get_Q_lk_transpose(k, l, J, m)
-            y_Jm = get_spherical_harmonics(x, m, J)
-            QY_re = QY_re + Q_lk_transpose * y_Jm.real
-            QY_img = QY_img + Q_lk_transpose * y_Jm.imag
-        w_re = w_re + radial_function(x, J, alpha, beta) * QY_re
-        w_img = w_img + radial_function(x, J, alpha, beta) * QY_img
-    return w_re,w_img
+            y_Jm = get_real_spherical_harmonics(x, J, m)
+            QY = QY + Q_lk_transpose * y_Jm
+        w = w + radial_function(x, J, alpha, beta) * QY
+    return w
 
 
 def forward_pass(x, f, k, l, alpha=1, beta=0.5):
-    w_re, w_img = get_kernel_weights(x, k, l, alpha, beta)
-    return np.matmul(w_re, f), np.matmul(w_img, f)
+    w = get_kernel_weights(x, k, l, alpha, beta)
+    return np.matmul(w, f)
 
 
 if __name__ == "__main__":
@@ -56,5 +61,20 @@ if __name__ == "__main__":
     np.random.seed(seed)
     x = np.random.random((3, 1))
     f = np.random.random((3, 1))
+    s = np.random.randn(3, 3)
+    r, __ = np.linalg.qr(s)
 
-    f_out = forward_pass(x, f, in_degree, out_degree, alpha=1, beta=0.5)
+    J = 1
+    y_J_r = np.array([get_real_spherical_harmonics(np.matmul(r,x), J , i) for i in (-1,0,1)])
+    Y_J = np.array([get_real_spherical_harmonics(x, J , i) for i in (-1,0,1)])
+    DJ_yJ = np.matmul(r,Y_J)
+
+    # y_J_r and DJ_yJ should be equal according to https://arxiv.org/abs/1802.08219 Section 4.1.1
+    print(y_J_r)
+    print(DJ_yJ)
+
+    # f_out = forward_pass(x, f, in_degree, out_degree, alpha=1, beta=0.5)
+    # f_out_rotate = forward_pass(np.matmul(r.T, x), np.matmul(r.T, f), in_degree,
+    #                             out_degree, alpha=1, beta=0.5)
+    # print(np.matmul(r, f_out))
+    # print(f_out_rotate)
