@@ -6,7 +6,7 @@
 #BSUB -nnodes 1
 #BSUB -q batch
 #BSUB -alloc_flags "gpumps"
-#BSUB -J train_lit_rgset_model_with_pl
+#BSUB -J train_lit_set_model_with_pl
 #BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/RGSET/job%J.out
 #BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/RGSET/job%J.out
 #BSUB --signal=SIGUSR1@90
@@ -23,4 +23,4 @@ conda activate "$PROJDIR"/venv
 
 # Run training script
 cd "$PROJDIR"/project || exit
-jsrun -r1 -g1 -a6 -c42 -bpacked:7 python lit_rgset.py
+jsrun -r1 -g1 -a6 -c42 -bpacked:7 python lit_set.py

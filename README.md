@@ -91,7 +91,7 @@ Then, navigate to any file and run it:
 
  ```bash
 # Run a particular module (example: RGSET architecture as main contribution):
-python3 project/lit_rgset.py
+python3 project/lit_set.py
 ```
 
 ## Imports
@@ -99,16 +99,16 @@ python3 project/lit_rgset.py
 This project is setup as a package which means you can now easily import any file into any other file like so:
 
 ```python
-from project.datasets.DIPS.g_data_module import GDataModule
-from project.lit_rgset import LitRGSET
+from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
+from project.lit_set import LitSET
 from pytorch_lightning import Trainer
 
 # Model
-model = LitRGSET()  # Provide model parameters here
+model = LitSET()  # Provide model parameters here
 
 # Data
 data_dir = 'final'  # Specify data directory here
-data_module = GDataModule(data_dir)
+data_module = RGDGLDataModule(data_dir)
 data_module.setup()
 
 # Train
