@@ -9,7 +9,7 @@ dependencies:
   - python=3.6
   - pip=20.2.3
   - dgl-cuda11.0
-  - pytorch-lightning=1.1.8
+  - pytorch-lightning=1.2.0
   - pytorch=1.7.1
   - pip:
       - -e .

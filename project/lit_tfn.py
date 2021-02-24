@@ -190,8 +190,8 @@ def cli_main():
     data_module = QM9DGLDataModule(batch_size=args.batch_size,
                                    num_dataloader_workers=args.num_workers,
                                    seed=args.seed)
-    data_module.setup()
     data_module.prepare_data()
+    data_module.setup()
 
     # -----------
     # Model

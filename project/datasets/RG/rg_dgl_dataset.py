@@ -11,10 +11,10 @@ def get_rgraph(num_nodes, num_edges, node_feature_size, edge_feature_size, dtype
     dst = G.edges()[1].numpy()
     # Add node features to graph
     pos = np.random.random((num_nodes, 3))  # [num_atoms,3]
-    node_feature = np.random.random((num_nodes, node_feature_size, 1))  # [num_atoms,node_feature_size,1]
+    node_features = np.random.random((num_nodes, node_feature_size, 1))  # [num_atoms,node_feature_size,1]
     # Add edge features to graph
-    edge_feature = np.random.random((num_edges, edge_feature_size))  # [num_atoms,edge_feature_size]
-    return get_graph(src, dst, pos, node_feature, edge_feature, dtype, False, num_nodes=num_nodes)
+    edge_features = np.random.random((num_edges, edge_feature_size))  # [num_atoms,edge_feature_size]
+    return get_graph(src, dst, pos, node_features, edge_features, dtype, False, num_nodes=num_nodes)
 
 
 class RGDGLDataset(Dataset):

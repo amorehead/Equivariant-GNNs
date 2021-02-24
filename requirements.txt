@@ -1,9 +1,9 @@
 # RGSET requirements
 setuptools==53.0.0
 click==7.1.2
-wandb==0.10.19
+wandb==0.10.20
 # numpy==1.19.4
-pytorch-lightning==1.1.8
+pytorch-lightning==1.2.0
 
 # SE(3)-Transformer requirements
 absl-py==0.11.0
