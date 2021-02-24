@@ -2,19 +2,15 @@ name: RGSET
 channels:
   - defaults
   - conda-forge
-  - pytorch
   - dglteam
+  - pytorch
 dependencies:
   - anaconda
   - python=3.6
   - pip=20.2.3
-  - pytorch-lightning=1.1.8
-  - pytorch
-#  - Install PyTorch 1.6.0 if on Summit
-#  - pytorch=1.6.0
   - dgl-cuda11.0
-#  - Install CUDA 10.1 version of DGL if on Lewis
-#  - dgl-cuda10.1
+  - pytorch-lightning=1.2.0
+  - pytorch=1.7.1
   - pip:
       - -e .
       - -r file:requirements.txt

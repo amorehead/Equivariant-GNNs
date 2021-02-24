@@ -10,11 +10,15 @@ from project.utils.utils import RandomRotation, collate
 class QM9DGLDataModule(LightningDataModule):
     """QM9 data module for DGL with PyTorch."""
 
-    def __init__(self, data_dir: str, task: str, batch_size=32, num_dataloader_workers=1, seed=42):
+    def __init__(self, data_dir='datasets/QM9/QM9_data.pt', task='homo',
+                 batch_size=32, num_dataloader_workers=1, seed=42):
         super().__init__()
 
+        # Dataset parameters
         self.data_dir = data_dir
         self.task = task
+
+        # Dataset meta-parameters
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
         self.seed = seed
@@ -25,12 +29,20 @@ class QM9DGLDataModule(LightningDataModule):
         self.qm9_test = None
 
     @property
-    def num_atom_features(self) -> int:
+    def node_feature_size(self) -> int:
         return self.qm9_train.num_atom_features
 
     @property
-    def num_bonds(self) -> int:
+    def edge_feature_size(self) -> int:
         return self.qm9_train.num_bonds
+
+    @property
+    def std(self) -> int:
+        return self.qm9_train.std
+
+    @property
+    def mean(self) -> int:
+        return self.qm9_train.mean
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU

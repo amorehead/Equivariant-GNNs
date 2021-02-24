@@ -51,16 +51,16 @@ class RandomRotation(object):
 
 # Equivariant basis construction #
 @profile
-def get_basis(Y, max_degree):
+def get_basis(Y, max_degree, device):
     """Precompute the SE(3)-equivariant weight basis.
     This is called by get_basis_and_r().
     Args:
         Y: spherical harmonic dict, returned by utils_steerable.precompute_sh()
         max_degree: non-negative int for degree of highest feature type
+        device: Torch device for which basis is constructed
     Returns:
         dict of equivariant bases, keys are in form '<d_in><d_out>'
     """
-    device = Y[0].device
     # No need to backprop through the basis construction
     with torch.no_grad():
         basis = {}
@@ -82,7 +82,7 @@ def get_basis(Y, max_degree):
         return basis
 
 
-def get_basis_and_r(G, max_degree):
+def get_basis_and_r(G, max_degree, device):
     """Return equivariant weight basis (basis) and internodal distances (r).
     Call this function *once* at the start of each forward pass of the model.
     It computes the equivariant weight basis, W_J^lk(x), and internodal
@@ -92,6 +92,7 @@ def get_basis_and_r(G, max_degree):
     Args:
         G: DGL graph instance of type dgl.DGLGraph()
         max_degree: non-negative int for degree of highest feature-type
+        device: Torch device for which basis is constructed
     Returns:
         dict of equivariant bases, keys are in form '<d_in><d_out>'
         vector of relative distances, ordered according to edge ordering of G
@@ -101,7 +102,7 @@ def get_basis_and_r(G, max_degree):
     # Spherical harmonic basis
     Y = precompute_sh(r_ij, 2 * max_degree)
     # Equivariant basis (dict['d_in><d_out>'])
-    basis = get_basis(Y, max_degree)
+    basis = get_basis(Y, max_degree, device)
     # Relative distances (scalar)
     r = torch.sqrt(torch.sum(G.edata['d'] ** 2, -1, keepdim=True))
     return basis, r
@@ -123,25 +124,17 @@ def shape_is(a, b, ignore_batch=1):
     return np.array_equal(shape_a, shape_b)
 
 
-def norm_with_epsilon(input_tensor, axis=None, keep_dims=False, epsilon=0.0):
-    """
-    Regularized norm
-    Args:
-        input_tensor: torch.Tensor
-    Returns:
-        torch.Tensor normed over axis
-    """
-    # return torch.sqrt(torch.max(torch.reduce_sum(torch.square(input_tensor), axis=axis, keep_dims=keep_dims), epsilon))
-    keep_dims = bool(keep_dims)
-    squares = torch.sum(input_tensor ** 2, axis=axis, keepdim=keep_dims)
-    squares = torch.max(squares, torch.tensor([epsilon]).to(squares.device))
-    return torch.sqrt(squares)
-
-
 def collate(samples):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     return batched_graph, torch.tensor(y)
+
+
+def rand_rot(x, dtype=np.float32):
+    s = np.random.randn(3, 3)
+    r, __ = np.linalg.qr(s)
+    r = r.astype(dtype)
+    return x @ r
 
 
 def norm2units(x, std, mean, task, denormalize=True, center=True):
@@ -155,19 +148,8 @@ def norm2units(x, std, mean, task, denormalize=True, center=True):
     return x
 
 
-def task_loss(pred, target, std, mean, task, use_mean=True):
-    l1_loss = torch.sum(torch.abs(pred - target))
-    l2_loss = torch.sum((pred - target) ** 2)
-    if use_mean:
-        l1_loss /= pred.shape[0]
-        l2_loss /= pred.shape[0]
-
-    rescale_loss = norm2units(l1_loss, std, mean, task)
-    return l1_loss, l2_loss, rescale_loss
-
-
 # -------------------------------------------------------------------------------------------------------------------------------------
-# Following code curated for SGSET (https://github.com/jianlin-cheng/DeepInteract):
+# Following code curated for RGSET (https://github.com/amorehead/RGSET):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -179,31 +161,26 @@ def collect_args():
     # -----------------
     # Model parameters
     # -----------------
-    parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
+    parser.add_argument('--num_layers', type=int, default=7, help="Number of equivariant layers")
     parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
-    parser.add_argument('--num_channels', type=int, default=16, help="Number of channels in middle layers")
+    parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
     parser.add_argument('--num_nlayers', type=int, default=0, help="Number of layers for nonlinearity")
-    parser.add_argument('--fully_connected', action='store_true', help="Include global node in graph")
-    parser.add_argument('--div', type=float, default=4, help="Low dimensional embedding fraction")
-    parser.add_argument('--pooling', type=str, default='avg', help="Choose from avg or max")
-    parser.add_argument('--head', type=int, default=1, help="Number of attention heads")
-    parser.add_argument('--geometric', type=bool, default=True, help="Whether to use a GVP for the FC layers")
+    parser.add_argument('--fully_connected', action='store_true', default=False, help="Include global node in graph")
+    parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
+    parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
+    parser.add_argument('--head', type=int, default=8, help="Number of attention heads")
 
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--batch_size', type=int, default=32, help="Batch size")
+    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
-    parser.add_argument('--num_epochs', type=int, default=50, help="Number of epochs")
+    parser.add_argument('--num_epochs', type=int, default=10, help="Number of epochs")
 
     # -----------------
     # Data parameters
     # -----------------
-    # parser.add_argument('--data_dir', type=str, default='datasets/DIPS/final/raw',
-    #                     help='Path to final raw data directory for DIPS')
-    # parser.add_argument('--data_dir', type=str, default='datasets/DB5/final/raw',
-    #                     help='Path to final raw data directory for DB5')
     parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
                         help='Path to preprocessed QM9 dataset')
     parser.add_argument('--task', type=str, default='homo',
@@ -212,18 +189,19 @@ def collect_args():
     # -----------------
     # Logging
     # -----------------
-    parser.add_argument('--model', type=str, default='LitSGSET', help="Model being used")
+    parser.add_argument('--model', type=str, default='LitRGSET', help="Model being used")
     parser.add_argument('--name', type=str, default=None, help="Run name")
     parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
     parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
     parser.add_argument('--save_dir', type=str, default="models", help="Directory name to save models")
-    parser.add_argument('--wandb', type=str, default='DeepInteract', help="WandB project name")
+    parser.add_argument('--wandb', type=str, default='rgset', help="WandB project name")
+    parser.add_argument('--entity', type=str, default='bml-lab', help="WandB project name")
 
     # -----------------
     # Miscellaneous
     # -----------------
     parser.add_argument('--num_workers', type=int, default=24, help="Number of data loader workers")
-    parser.add_argument('--profile', action='store_true', help="Exit after 10 steps for profiling")
+    parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
 
     # -----------------
     # Seed parameter
@@ -240,8 +218,10 @@ def process_args(args, unparsed_argv):
     # Name fixing
     # ---------------------------------------
     if not args.name:
-        args.name = f'SET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        # args.name = f'SGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        # args.name = f'RGTFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        args.name = f'RGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        # args.name = f'TetrisSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        # args.name = f'MCSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
 
     # ---------------------------------------
     # Model directory creation
@@ -267,4 +247,37 @@ def process_args(args, unparsed_argv):
 
 def construct_wandb_pl_logger(args):
     """Return an instance of WandbLogger with corresponding project and name strings."""
-    return WandbLogger(name=args.name, project=args.wandb) if args.name else WandbLogger(project=f'{args.wandb}')
+    return WandbLogger(name=args.name, project=args.wandb, entity=args.entity) \
+        if args.name else WandbLogger(project=f'{args.wandb}', entity=args.entity)
+
+
+def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
+    # src, dst : indices for vertices of source and destination, np.array
+    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
+    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
+    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
+    if num_nodes:
+        G = dgl.graph((src, dst), num_nodes=num_nodes)
+    else:
+        G = dgl.graph((src, dst))
+    if undirected:
+        G = dgl.to_bidirected(G)
+    # Add node features to graph
+    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
+    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
+    # Add edge features to graph
+    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
+    return G
+
+
+def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
+    # pos :n by 3 np.array for xyz
+    x = np.array(range(pos.shape[0]))
+    src = np.repeat(x, x.shape[0])
+    dst = np.tile(x, x.shape[0])
+    flag = src != dst
+    G = dgl.graph((src[flag], dst[flag]))
+    G.ndata['x'] = pos
+    G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
+    G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
+    return G
