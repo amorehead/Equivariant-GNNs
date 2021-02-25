@@ -200,7 +200,7 @@ def collect_args():
     # -----------------
     # Miscellaneous
     # -----------------
-    parser.add_argument('--num_workers', type=int, default=24, help="Number of data loader workers")
+    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
     parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
 
     # -----------------
