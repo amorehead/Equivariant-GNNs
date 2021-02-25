@@ -3,11 +3,8 @@ from typing import Optional
 import dgl
 import torch
 from dgl.data import CoraFullDataset, CoraBinary
-from numpy import random
 from pytorch_lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
-
-from project.utils.utils import collate
 
 
 class CoraDGLDataModule(LightningDataModule):
@@ -47,11 +44,15 @@ class CoraDGLDataModule(LightningDataModule):
         for i, graph in enumerate(cora_binary_dataset.graphs):
             edges = graph.edges.__call__()
             reformatted_graph = dgl.graph((edges[0].data.tolist(), edges[1].data.tolist()))
-            reformatted_graph.ndata['x'] = torch.tensor([[0.0, 0.0, 0.0] for _ in range(reformatted_graph.num_nodes())])  # [num_nodes,3]
-            reformatted_graph.ndata['f'] = torch.tensor([0.0 for _ in range(reformatted_graph.num_nodes())])  # [num_nodes,node_feature_size]
+            reformatted_graph.ndata['x'] = torch.tensor(
+                [[0.0, 0.0, 0.0] for _ in range(reformatted_graph.num_nodes())])  # [num_nodes,3]
+            reformatted_graph.ndata['f'] = torch.tensor(
+                [0.0 for _ in range(reformatted_graph.num_nodes())])  # [num_nodes,node_feature_size]
             reformatted_graph.ndata['y'] = torch.from_numpy(cora_binary_dataset.labels[i])  # [num_nodes,1]
-            reformatted_graph.edata['d'] = torch.tensor([[0.0, 0.0, 0.0] for _ in range(reformatted_graph.num_edges())])  # [num_edges,3]
-            reformatted_graph.edata['w'] = torch.tensor([0.0 for _ in range(reformatted_graph.num_edges())])  # [num_nodes,edge_feature_size]
+            reformatted_graph.edata['d'] = torch.tensor(
+                [[0.0, 0.0, 0.0] for _ in range(reformatted_graph.num_edges())])  # [num_edges,3]
+            reformatted_graph.edata['w'] = torch.tensor(
+                [0.0 for _ in range(reformatted_graph.num_edges())])  # [num_nodes,edge_feature_size]
             reformatted_graphs.append(reformatted_graph)
         cora_binary_dataset.graphs = reformatted_graphs
         return cora_binary_dataset

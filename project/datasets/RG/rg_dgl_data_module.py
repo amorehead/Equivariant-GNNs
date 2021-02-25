@@ -21,8 +21,8 @@ class RGDGLDataModule(LightningDataModule):
         self.n_hb = n_hb
         self.e_lb = e_lb
         self.e_hb = e_hb
-        self.node_feature_size = node_feature_size
-        self.edge_feature_size = edge_feature_size
+        self.num_node_features = node_feature_size
+        self.num_edge_features = edge_feature_size
         self.size = size
         self.out_dim = out_dim
         self.train_transform = train_transform
@@ -42,22 +42,22 @@ class RGDGLDataModule(LightningDataModule):
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU
         self.rg_train = RGDGLDataset(n_lb=self.n_lb, n_hb=self.n_hb, e_lb=self.e_lb, e_hb=self.e_hb,
-                                     node_feature_size=self.node_feature_size, edge_feature_size=self.edge_feature_size,
+                                     node_feature_size=self.num_node_features, edge_feature_size=self.num_edge_features,
                                      size=self.size, out_dim=self.out_dim, transform=self.train_transform,
                                      dtype=self.dtype)
 
     def setup(self, stage: Optional[str] = None):
         # Assign training/validation/testing data set for use in DataLoaders - called on every GPU
         self.rg_train = RGDGLDataset(n_lb=self.n_lb, n_hb=self.n_hb, e_lb=self.e_lb, e_hb=self.e_hb,
-                                     node_feature_size=self.node_feature_size, edge_feature_size=self.edge_feature_size,
+                                     node_feature_size=self.num_node_features, edge_feature_size=self.num_edge_features,
                                      size=self.size, out_dim=self.out_dim, transform=self.train_transform,
                                      dtype=self.dtype)
         self.rg_val = RGDGLDataset(n_lb=self.n_lb, n_hb=self.n_hb, e_lb=self.e_lb, e_hb=self.e_hb,
-                                   node_feature_size=self.node_feature_size, edge_feature_size=self.edge_feature_size,
+                                   node_feature_size=self.num_node_features, edge_feature_size=self.num_edge_features,
                                    size=self.size, out_dim=self.out_dim, transform=self.test_transform,
                                    dtype=self.dtype)
         self.rg_test = RGDGLDataset(n_lb=self.n_lb, n_hb=self.n_hb, e_lb=self.e_lb, e_hb=self.e_hb,
-                                    node_feature_size=self.node_feature_size, edge_feature_size=self.edge_feature_size,
+                                    node_feature_size=self.num_node_features, edge_feature_size=self.num_edge_features,
                                     size=self.size, out_dim=self.out_dim, transform=self.test_transform,
                                     dtype=self.dtype)
 

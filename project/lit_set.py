@@ -6,7 +6,7 @@ from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
+from project.datasets.Tetris.tetris_dgl_data_module import TetrisDGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
@@ -192,9 +192,9 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    data_module = QM9DGLDataModule(batch_size=args.batch_size,
-                                   num_dataloader_workers=args.num_workers,
-                                   seed=args.seed)
+    data_module = TetrisDGLDataModule(batch_size=args.batch_size,
+                                      num_dataloader_workers=args.num_workers,
+                                      seed=args.seed)
     data_module.prepare_data()
     data_module.setup()
 
@@ -202,19 +202,16 @@ def cli_main():
     # Model
     # -----------
     lit_set = LitSET(num_layers=args.num_layers,
-                     atom_feature_size=data_module.node_feature_size,
+                     atom_feature_size=data_module.num_node_features,
                      num_channels=args.num_channels,
                      num_nlayers=args.num_nlayers,
                      num_degrees=args.num_degrees,
-                     edge_dim=data_module.edge_feature_size,
+                     edge_dim=data_module.num_edge_features,
                      div=args.div,
                      pooling=args.pooling,
                      n_heads=args.head,
                      lr=args.lr,
-                     num_epochs=args.num_epochs,
-                     std=data_module.std,
-                     mean=data_module.mean,
-                     task=args.task)
+                     num_epochs=args.num_epochs)
 
     # ------------
     # Checkpoint

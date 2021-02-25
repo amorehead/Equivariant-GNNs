@@ -12,8 +12,9 @@
 #BSUB --signal=SIGUSR1@90
 #################################################################################################
 
-# Remote project path
+# Remote project path and DGL backend override
 export PROJDIR=$MEMBERWORK/bip198/Repositories/Lab_Repositories/RGSET
+export DGLBACKEND=pytorch  # Required to override default ~/.dgl config directory which is read-only
 
 # Configure Conda for BSUB script environment
 eval "$(conda shell.bash hook)"

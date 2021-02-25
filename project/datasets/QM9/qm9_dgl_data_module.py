@@ -29,11 +29,11 @@ class QM9DGLDataModule(LightningDataModule):
         self.qm9_test = None
 
     @property
-    def node_feature_size(self) -> int:
+    def num_node_features(self) -> int:
         return self.qm9_train.num_atom_features
 
     @property
-    def edge_feature_size(self) -> int:
+    def num_edge_features(self) -> int:
         return self.qm9_train.num_bonds
 
     @property
