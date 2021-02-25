@@ -227,7 +227,7 @@ def process_args(args, unparsed_argv):
     # Model directory creation
     # ---------------------------------------
     if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+        os.mkdir(args.save_dir)
 
     # ---------------------------------------
     # Seed fixing for random numbers
