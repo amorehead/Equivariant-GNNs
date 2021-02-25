@@ -163,7 +163,7 @@ class LitSET(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'test_rescaled_l1_loss'
+        metric_to_track = 'val_l2_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -171,8 +171,8 @@ class LitSET(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="test_rescaled_l1_loss", mode="max")
-        checkpoint = ModelCheckpoint(monitor="test_rescaled_l1_loss", save_top_k=1)
+        early_stop = EarlyStopping(monitor="val_l2_loss", mode="max")
+        checkpoint = ModelCheckpoint(monitor="val_l2_loss", save_top_k=1)
         return [early_stop, checkpoint]
 
 
@@ -218,7 +218,7 @@ def cli_main():
     # ------------
     checkpoint_save_path = os.path.join(args.save_dir, f'{args.name}.pth')
     try:
-        lit_set = LitSET.load_from_checkpoint(f'{args.name}.pth')
+        lit_set = LitSET.load_from_checkpoint(checkpoint_save_path)
         print(f'Resuming from checkpoint {checkpoint_save_path}\n')
     except:
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
