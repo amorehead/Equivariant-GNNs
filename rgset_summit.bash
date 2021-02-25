@@ -32,4 +32,4 @@ export no_proxy='localhost,127.0.0.0/8,.ccs.ornl.gov,.ncrc.gov'
 
 # Run training script
 cd "$PROJDIR"/project || exit
-jsrun -r1 -g1 -a6 -c42 -bpacked:7 python lit_set.py
+jsrun -r1 -g6 -a6 -c42 -bpacked:7 python lit_set.py
