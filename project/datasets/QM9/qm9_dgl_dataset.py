@@ -25,10 +25,11 @@ class QM9DGLDataset(Dataset):
         Args:
             file_address: path to data
             task: target task ["homo", ...]
-            mode: [train/val/test] mode
+            mode: [train/valid/test] mode
             transform: data augmentation functions
             fully_connected: return a fully connected graph
         """
+        assert mode in ['train', 'valid', 'test']
         self.file_address = file_address
         self.task = task
         self.mode = mode

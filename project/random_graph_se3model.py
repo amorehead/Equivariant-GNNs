@@ -1,16 +1,17 @@
 import os
 import warnings
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
 import dgl
 import numpy as np
 import torch
 from torch import optim, nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
-from equivariant_attention.modules import GConvSE3, GNormSE3, get_basis_and_r, GSE3Res, GMaxPooling, GAvgPooling
-from equivariant_attention.fibers import Fiber
+from project.datasets.RG.rg_dgl_dataset import RGDGLDataset
+from project.utils.fibers import Fiber
+from project.utils.modules import GConvSE3, GNormSE3, GMaxPooling, get_basis_and_r, GSE3Res, GAvgPooling
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 batch_size = 4
 device = torch.device('cuda:0')
@@ -31,7 +32,7 @@ pooling = 'max'
 print_interval = 250
 profile = False
 restore = None
-save_dir = '/home/chen/test.pt'
+save_dir = '~/test_model.pt'
 seed = 1992
 task = 'homo'
 
@@ -81,7 +82,6 @@ class TFN(nn.Module):
         print(self.block2)
 
     def _build_gcn(self, fibers, out_dim):
-
         block0 = []
         fin = fibers['in']
         for i in range(self.num_layers - 1):
@@ -183,35 +183,6 @@ class SE3Transformer(nn.Module):
         return h
 
 
-class GDataset(Dataset):
-    def __init__(self, num_nodes=20, num_edges=10, node_feature_size=6, edge_feature_size=4,
-                 size=300, dtype=np.float32):
-        self.num_nodes = num_nodes
-        self.num_edges = num_edges
-        self.size = size
-        self.dtype = dtype
-        self.node_feature_size = node_feature_size
-        self.edge_feature_size = edge_feature_size
-
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, idx):
-        y = np.array([np.random.random(1).astype(self.dtype)])
-        # Create graph
-        # G = dgl.DGLGraph((src,dst))
-        G = dgl.rand_graph(self.num_nodes, self.num_edges)
-        # Add node features to graph
-        G.ndata['x'] = torch.tensor(np.random.random((self.num_nodes, 3)).astype(self.dtype))  # [num_atoms,3]
-        G.ndata['f'] = torch.tensor(
-            np.random.random((self.num_nodes, self.node_feature_size, 1)).astype(self.dtype))  # [num_atoms,6,1]
-        # Add edge features to graph
-        G.edata['d'] = torch.tensor(np.random.random((self.num_edges, 3)).astype(self.dtype))  # [num_atoms,3]
-        G.edata['w'] = torch.tensor(
-            np.random.random((self.num_edges, self.edge_feature_size)).astype(self.dtype))  # [num_atoms,4]
-        return G, y
-
-
 def task_loss(pred, target, use_mean=True):
     l1_loss = torch.sum(torch.abs(pred - target))
     l2_loss = torch.sum((pred - target) ** 2)
@@ -241,7 +212,7 @@ save_path = os.path.join(save_dir)
 
 # Run training
 print('Begin training')
-test_loader = DataLoader(GDataset(),
+test_loader = DataLoader(RGDGLDataset(),
                          batch_size=batch_size,
                          shuffle=False,
                          collate_fn=collate,
