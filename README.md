@@ -1,6 +1,6 @@
 <div align="center">    
 
-# RGSET
+# Equivariant-GNNs
 
 <!--
 [![Paper](http://img.shields.io/badge/paper-arxiv.1001.2234-B31B1B.svg)](https://www.nature.com/articles/nature14539)
@@ -14,7 +14,7 @@ ARXIV
 [![Paper](http://img.shields.io/badge/arxiv-math.co:1480.1111-B31B1B.svg)](https://www.nature.com/articles/nature14539)
 -->
 
-![CI testing](https://github.com/amorehead/RGSET/workflows/CI%20testing/badge.svg?branch=master&event=push)
+![CI testing](https://github.com/amorehead/Equivariant-GNNs/workflows/CI%20testing/badge.svg?branch=master&event=push)
 
 
 <!--
@@ -24,7 +24,7 @@ Conference
 
 ## Description
 
-An SE(3)-equivariant transformer for random graphs.
+An environment for running experiments with equivariant GNN architectures
 
 ## How to run
 
@@ -32,10 +32,10 @@ First, install and configure Conda environment:
 
 ```bash
 # Clone project:
-git clone https://github.com/amorehead/RGSET
+git clone https://github.com/amorehead/Equivariant-GNNs
 
 # Change to project directory:
-cd RGSET
+cd Equivariant-GNNs
 
 # (If on HPC cluster) Load 'open-ce' module
 module load open-ce/0.1-0
@@ -90,7 +90,7 @@ export WANDB_CONFIG_DIR=.
 Then, navigate to any file and run it:
 
  ```bash
-# Run a particular module (example: RGSET architecture as main contribution):
+# Run a particular module (example: Equivariant-GNNs architecture as main contribution):
 python3 project/lit_set.py
 ```
 
@@ -122,8 +122,8 @@ trainer.test(test_dataloaders=data_module.test_dataloader())
 ### Citation
 
 ```
-@article{RGSET,
-  title={RGSET: An SE(3)-Equivariant Transformer for Random Graphs},
+@article{Equivariant-GNNs,
+  title={Equivariant-GNNs: An environment for running experiments with equivariant GNN architectures},
   author={Morehead, Alex, Chen, Chen, and Cheng, Jianlin},
   journal={N/A},
   year={2021}
