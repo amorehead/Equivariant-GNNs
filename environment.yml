@@ -5,12 +5,15 @@ channels:
   - dglteam
   - pytorch
 dependencies:
+#  - If not running on Summit - for Python 3.8 and CUDA 11.0:
+#  - python=3.8
+#  - cudatoolkit=11.0
+#  - pytorch=1.7.1
+#  - dgl-cuda11.0
   - anaconda
+  - pip
   - python=3.6
-  - pip=20.2.3
-  - dgl-cuda11.0
-  - pytorch-lightning=1.2.0
-  - pytorch=1.7.1
+  - pytorch
   - pip:
       - -e .
       - -r file:requirements.txt

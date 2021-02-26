@@ -219,9 +219,10 @@ def process_args(args, unparsed_argv):
     # ---------------------------------------
     if not args.name:
         # args.name = f'RGTFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        args.name = f'RGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        # args.name = f'RGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
         # args.name = f'TetrisSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
         # args.name = f'MCSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
+        args.name = f'EGNN-l{args.num_layers}-c{args.num_channels}'
 
     # ---------------------------------------
     # Model directory creation
