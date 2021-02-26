@@ -1,4 +1,4 @@
-# RGSET requirements
+# Equivariant-GNNs requirements
 setuptools==53.0.0
 click==7.1.2
 wandb==0.10.20

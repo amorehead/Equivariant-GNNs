@@ -149,7 +149,7 @@ def norm2units(x, std, mean, task, denormalize=True, center=True):
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------
-# Following code curated for RGSET (https://github.com/amorehead/RGSET):
+# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -194,7 +194,7 @@ def collect_args():
     parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
     parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
     parser.add_argument('--save_dir', type=str, default="models", help="Directory name to save models")
-    parser.add_argument('--wandb', type=str, default='rgset', help="WandB project name")
+    parser.add_argument('--wandb', type=str, default='equivariant-gnns', help="WandB project name")
     parser.add_argument('--entity', type=str, default='bml-lab', help="WandB project name")
 
     # -----------------

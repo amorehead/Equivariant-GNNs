@@ -13,7 +13,7 @@
 ###############################################################
 
 # Remote project path
-export PROJDIR=/home/$USER/data/RGSET
+export PROJDIR=/home/$USER/data/Equivariant-GNNs
 
 # Configure Conda for SBATCH script environment
 module load miniconda3

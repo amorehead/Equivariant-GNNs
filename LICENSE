@@ -1,4 +1,4 @@
-RGSET makes use of source code derived from the deep learning project template
+Equivariant-GNNs makes use of source code derived from the deep learning project template
 for PyTorch Lightning (https://github.com/PyTorchLightning/deep-learning-project-template). The Apache-2.0
 licensing for this deep learning project template is as follows:
 

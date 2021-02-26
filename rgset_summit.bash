@@ -7,13 +7,13 @@
 #BSUB -q batch
 #BSUB -alloc_flags "gpumps"
 #BSUB -J train_lit_set_model_with_pl
-#BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/RGSET/job%J.out
-#BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/RGSET/job%J.out
+#BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
+#BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB --signal=SIGUSR1@90
 #################################################################################################
 
 # Remote project path and DGL backend override
-export PROJDIR=$MEMBERWORK/bip198/Repositories/Lab_Repositories/RGSET
+export PROJDIR=$MEMBERWORK/bip198/Repositories/Lab_Repositories/Equivariant-GNNs
 export DGLBACKEND=pytorch  # Required to override default ~/.dgl config directory which is read-only
 
 # Configure Conda for BSUB script environment

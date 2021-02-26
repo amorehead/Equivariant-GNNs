@@ -1,4 +1,4 @@
-name: RGSET
+name: Equivariant-GNNs
 channels:
   - defaults
   - conda-forge
