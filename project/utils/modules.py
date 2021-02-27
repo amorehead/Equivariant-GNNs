@@ -1,7 +1,3 @@
-"""
-Source code originally from SE(3)-Transformer (https://github.com/FabianFuchsML/se3-transformer-public/)
-"""
-
 from typing import Dict
 
 import dgl
@@ -18,6 +14,10 @@ from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J,
     precompute_sh
 from project.utils.utils_profiling import profile  # load before other local modules
 
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code derived from SE(3)-Transformer (https://github.com/FabianFuchsML/se3-transformer-public/):
+# -------------------------------------------------------------------------------------------------------------------------------------
 
 @profile
 def get_basis(Y, max_degree):
@@ -680,3 +680,92 @@ class GMaxPooling(nn.Module):
     def forward(self, features, G, **kwargs):
         h = features['0'][..., -1]
         return self.pool(G, h)
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
+# -------------------------------------------------------------------------------------------------------------------------------------
+
+class GConvEn(nn.Module):
+    """A graph neural network layer as a DGL module.
+
+    GConvEn stands for a Graph Convolution E(n)-equivariant layer. It is the
+    equivalent of a linear layer in an MLP, a conv layer in a CNN, or a graph
+    conv layer in a GCN.
+    """
+
+    def __init__(self, f_in, f_out):
+        """E(n)-equivariant Graph Conv Layer
+        Args:
+            f_in: list of tuples [(multiplicities, type),...]
+            f_out: list of tuples [(multiplicities, type),...]
+        """
+        super().__init__()
+        self.f_in = f_in
+        self.f_out = f_out
+
+    def __repr__(self):
+        return f'GConvEn(structure={self.f_out})'
+
+    def udf_u_mul_e(self, d_out):
+        """Compute the convolution for a single output feature type.
+        This function is set up as a User Defined Function in DGL.
+        Args:
+            d_out: output feature type
+        Returns:
+            edge -> node function handle
+        """
+
+        def fnc(edges):
+            # Neighbor -> center messages
+            msg = 0
+            for m_in, d_in in self.f_in.structure:
+                src = edges.src[f'{d_in}'].view(-1, m_in * (2 * d_in + 1), 1)
+                edge = edges.data[f'({d_in},{d_out})']
+                msg = msg + torch.matmul(edge, src)
+            msg = msg.view(msg.shape[0], -1, 2 * d_out + 1)
+
+            # Center -> center messages
+            if self.self_interaction:
+                if f'{d_out}' in self.kernel_self.keys():
+                    dst = edges.dst[f'{d_out}']
+                    W = self.kernel_self[f'{d_out}']
+                    msg = msg + torch.matmul(W, dst)
+
+            return {'msg': msg.view(msg.shape[0], -1, 2 * d_out + 1)}
+
+        return fnc
+
+    @profile
+    def forward(self, h, G=None, r=None, basis=None, **kwargs):
+        """Forward pass of the linear layer
+        Args:
+            G: minibatch of (homo)graphs
+            h: dict of features
+            r: inter-atomic distances
+            basis: pre-computed Q * Y
+        Returns:
+            tensor with new features [B, n_points, n_features_out]
+        """
+        with G.local_scope():
+            # Add node features to local graph scope
+            for k, v in h.items():
+                G.ndata[k] = v
+
+            # Add edge features
+            if 'w' in G.edata.keys():
+                w = G.edata['w']
+                feat = torch.cat([w, r], -1)
+            else:
+                feat = torch.cat([r, ], -1)
+
+            for (mi, di) in self.f_in.structure:
+                for (mo, do) in self.f_out.structure:
+                    etype = f'({di},{do})'
+                    G.edata[etype] = self.kernel_unary[etype](feat, basis)
+
+            # Perform message-passing for each output feature type
+            for d in self.f_out.degrees:
+                G.update_all(self.udf_u_mul_e(d), fn.mean('msg', f'out{d}'))
+
+            return {f'{d}': G.ndata[f'out{d}'] for d in self.f_out.degrees}
