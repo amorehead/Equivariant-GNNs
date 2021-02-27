@@ -193,21 +193,6 @@ def cli_main():
     data_module.prepare_data()
     data_module.setup()
 
-    # -----------
-    # Model
-    # -----------
-    lit_tfn = LitTFN(num_layers=args.num_layers,
-                     atom_feature_size=args.num_node_features,
-                     num_channels=args.num_channels,
-                     num_nlayers=args.num_nlayers,
-                     num_degrees=args.num_degrees,
-                     edge_dim=args.num_edge_features,
-                     lr=args.lr,
-                     num_epochs=args.num_epochs,
-                     std=data_module.std,
-                     mean=data_module.mean,
-                     task=args.task)
-
     # ------------
     # Checkpoint
     # ------------
@@ -216,13 +201,27 @@ def cli_main():
         lit_tfn = LitTFN.load_from_checkpoint(f'{args.name}.pth')
         print(f'Resuming from checkpoint {checkpoint_save_path}\n')
     except:
+        # -----------
+        # Model
+        # -----------
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
+        lit_tfn = LitTFN(num_layers=args.num_layers,
+                         atom_feature_size=args.num_node_features,
+                         num_channels=args.num_channels,
+                         num_nlayers=args.num_nlayers,
+                         num_degrees=args.num_degrees,
+                         edge_dim=args.num_edge_features,
+                         lr=args.lr,
+                         num_epochs=args.num_epochs,
+                         std=data_module.std,
+                         mean=data_module.mean,
+                         task=args.task)
 
     # -----------
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    trainer.max_epochs = args.num_epochs
+    trainer.min_epochs = args.num_epochs
 
     # Logging all args to wandb
     logger = construct_wandb_pl_logger(args)

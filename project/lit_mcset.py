@@ -180,21 +180,6 @@ def cli_main():
     data_module.prepare_data()
     data_module.setup()
 
-    # -----------
-    # Model
-    # -----------
-    lit_mcset = LitMCSET(num_layers=args.num_layers,
-                         atom_feature_size=data_module.num_node_features,
-                         num_channels=args.num_channels,
-                         num_nlayers=args.num_nlayers,
-                         num_degrees=args.num_degrees,
-                         edge_dim=data_module.num_edge_features,
-                         div=args.div,
-                         pooling=args.pooling,
-                         n_heads=args.head,
-                         lr=args.lr,
-                         num_epochs=args.num_epochs)
-
     # ------------
     # Checkpoint
     # ------------
@@ -203,13 +188,27 @@ def cli_main():
         lit_mcset = LitMCSET.load_from_checkpoint(f'{args.name}.pth')
         print(f'Resuming from checkpoint {checkpoint_save_path}\n')
     except:
+        # -----------
+        # Model
+        # -----------
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
+        lit_mcset = LitMCSET(num_layers=args.num_layers,
+                             atom_feature_size=data_module.num_node_features,
+                             num_channels=args.num_channels,
+                             num_nlayers=args.num_nlayers,
+                             num_degrees=args.num_degrees,
+                             edge_dim=data_module.num_edge_features,
+                             div=args.div,
+                             pooling=args.pooling,
+                             n_heads=args.head,
+                             lr=args.lr,
+                             num_epochs=args.num_epochs)
 
     # -----------
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    trainer.max_epochs = args.num_epochs
+    trainer.min_epochs = args.num_epochs
 
     # Logging all args to wandb
     # logger = construct_wandb_pl_logger(args)
