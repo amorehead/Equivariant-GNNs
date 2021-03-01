@@ -8,6 +8,7 @@ import torch.nn as nn
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 from dgl.nn.pytorch.softmax import edge_softmax
 from packaging import version
+from torch import Tensor
 
 from project.utils.fibers import Fiber, fiber2head
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, get_spherical_from_cartesian_torch, \
@@ -686,6 +687,14 @@ class GMaxPooling(nn.Module):
 # Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * x.sigmoid()
+
+
+SiLU = nn.SiLU if hasattr(nn, 'SiLU') else Swish
+
+
 class GConvEn(nn.Module):
     """A graph neural network layer as a DGL module.
 
@@ -694,78 +703,88 @@ class GConvEn(nn.Module):
     conv layer in a GCN.
     """
 
-    def __init__(self, f_in, f_out):
+    def __init__(self, node_feat: int, coord_feat: int = 16, edge_feat: int = 0, fourier_feat: int = 0):
         """E(n)-equivariant Graph Conv Layer
-        Args:
-            f_in: list of tuples [(multiplicities, type),...]
-            f_out: list of tuples [(multiplicities, type),...]
+
+        Parameters
+        ----------
+        node_feat : int
+            Node feature size.
+        coord_feat : int
+            Coordinates feature size.
+        edge_feat : int
+            Edge feature size.
+        fourier_feat : int
+            Number of Fourier features to use.
         """
         super().__init__()
-        self.f_in = f_in
-        self.f_out = f_out
+        self.node_feat = node_feat
+        self.coord_feat = coord_feat
+        self.edge_feat = edge_feat
+        self.fourier_feat = fourier_feat
+        self.edge_input_size = (self.fourier_feat * 2) + (self.node_feat * 2) + (self.edge_feat + 1)
+
+        self.node_mlp = nn.Sequential(
+            nn.Linear(self.node_feat + self.coord_feat, self.node_feat * 2),
+            SiLU(),
+            nn.Linear(self.node_feat * 2, self.node_feat),
+        )
+
+        self.coors_mlp = nn.Sequential(
+            nn.Linear(self.coord_feat, self.coord_feat * 4),
+            SiLU(),
+            nn.Linear(self.coord_feat * 4, 1)
+        )
+
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(self.edge_input_size, self.edge_input_size * 2),
+            SiLU(),
+            nn.Linear(self.edge_input_size * 2, self.coord_feat),
+            SiLU()
+        )
 
     def __repr__(self):
-        return f'GConvEn(structure={self.f_out})'
-
-    def udf_u_mul_e(self, d_out):
-        """Compute the convolution for a single output feature type.
-        This function is set up as a User Defined Function in DGL.
-        Args:
-            d_out: output feature type
-        Returns:
-            edge -> node function handle
-        """
-
-        def fnc(edges):
-            # Neighbor -> center messages
-            msg = 0
-            for m_in, d_in in self.f_in.structure:
-                src = edges.src[f'{d_in}'].view(-1, m_in * (2 * d_in + 1), 1)
-                edge = edges.data[f'({d_in},{d_out})']
-                msg = msg + torch.matmul(edge, src)
-            msg = msg.view(msg.shape[0], -1, 2 * d_out + 1)
-
-            # Center -> center messages
-            if self.self_interaction:
-                if f'{d_out}' in self.kernel_self.keys():
-                    dst = edges.dst[f'{d_out}']
-                    W = self.kernel_self[f'{d_out}']
-                    msg = msg + torch.matmul(W, dst)
-
-            return {'msg': msg.view(msg.shape[0], -1, 2 * d_out + 1)}
-
-        return fnc
+        return f'GConvEn(structure={self.out_feat})'
 
     @profile
-    def forward(self, h, G=None, r=None, basis=None, **kwargs):
+    def forward(self, h: Tensor, x: Tensor, e: Tensor = None):
         """Forward pass of the linear layer
-        Args:
-            G: minibatch of (homo)graphs
-            h: dict of features
-            r: inter-atomic distances
-            basis: pre-computed Q * Y
-        Returns:
-            tensor with new features [B, n_points, n_features_out]
+
+        Parameters
+        ----------
+        h : Tensor
+            The input node embedding.
+        x : Tensor
+            The input coordinates embedding.
+        e : Tensor
+            The input edge embedding.
         """
-        with G.local_scope():
-            # Add node features to local graph scope
-            for k, v in h.items():
-                G.ndata[k] = v
+        b, n, d, fourier_features = *h.shape, self.fourier_features
 
-            # Add edge features
-            if 'w' in G.edata.keys():
-                w = G.edata['w']
-                feat = torch.cat([w, r], -1)
-            else:
-                feat = torch.cat([r, ], -1)
+        rel_coors = rearrange(x, 'b i d -> b i () d') - rearrange(x, 'b j d -> b () j d')
+        rel_dist = rel_coors.norm(dim=-1, keepdim=True)
 
-            for (mi, di) in self.f_in.structure:
-                for (mo, do) in self.f_out.structure:
-                    etype = f'({di},{do})'
-                    G.edata[etype] = self.kernel_unary[etype](feat, basis)
+        if fourier_features > 0:
+            rel_dist = fourier_encode_dist(rel_dist, num_encodings=fourier_features)
+            rel_dist = rearrange(rel_dist, 'b i j () d -> b i j d')
 
-            # Perform message-passing for each output feature type
-            for d in self.f_out.degrees:
-                G.update_all(self.udf_u_mul_e(d), fn.mean('msg', f'out{d}'))
+        feats_i = repeat(h, 'b i d -> b i n d', n=n)
+        feats_j = repeat(h, 'b j d -> b n j d', n=n)
+        edge_input = torch.cat((feats_i, feats_j, rel_dist), dim=-1)
 
-            return {f'{d}': G.ndata[f'out{d}'] for d in self.f_out.degrees}
+        if exists(e):
+            edge_input = torch.cat((edge_input, e), dim=-1)
+
+        m_ij = self.edge_mlp(edge_input)
+
+        coord_weights = self.coors_mlp(m_ij)
+        coord_weights = rearrange(coord_weights, 'b i j () -> b i j')
+
+        coors_out = einsum('b i j, b i j c -> b i c', coord_weights, rel_coors) + x
+
+        m_i = m_ij.sum(dim=-2)
+
+        node_mlp_input = torch.cat((h, m_i), dim=-1)
+        node_out = self.node_mlp(node_mlp_input) + h
+
+        return node_out, coors_out

@@ -1,30 +1,33 @@
 import os
 
+import numpy as np
 import pytorch_lightning as pl
+import torch
 from dgl.data import CoraGraphDataset
-from dgl.nn.pytorch import GraphConv
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.nn.functional import relu, cross_entropy
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data import DataLoader
 
-from project.utils.utils import collect_args, process_args, construct_wandb_pl_logger
+from project.utils.modules import GConvEn
+from project.utils.utils import collect_args, process_args
 
 
 class LitEGNN(pl.LightningModule):
     """An E(n)-equivariant GNN."""
 
-    def __init__(self, in_feats: int = 1, h_feats: int = 4, num_classes: int = 2,
-                 num_layers: int = 4, num_channels: int = 16, pooling: str = 'avg',
-                 lr: float = 1e-3, num_epochs: int = 5):
+    def __init__(self, node_feat: int = 1, coord_feat: int = 4, edge_feat: int = 4,
+                 num_classes: int = 2, num_layers: int = 4, num_channels: int = 16,
+                 pooling: str = 'avg', lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for an EGNN."""
         super().__init__()
         self.save_hyperparameters()
 
         # Build the network
-        self.in_feats = in_feats
-        self.h_feats = h_feats
+        self.node_feat = node_feat
+        self.coord_feat = coord_feat
+        self.edge_feat = edge_feat
         self.num_classes = num_classes
         self.num_layers = num_layers
         self.num_channels = num_channels
@@ -41,35 +44,37 @@ class LitEGNN(pl.LightningModule):
     def build_gnn_model(self):
         """Define the layers of a single GNN."""
         # Marshal all equivariant layers
-        self.conv1 = GraphConv(self.in_feats, self.h_feats)
-        self.conv2 = GraphConv(self.h_feats, self.num_classes)
+        self.conv1 = GConvEn(self.in_feats, self.h_feats)
+        self.conv2 = GConvEn(self.h_feats, self.num_classes)
 
     # ---------------------
     # Training
     # ---------------------
-    def forward(self, graph, in_feat):
+    def forward(self, graph, h, x, e):
         """Make a forward pass through the entire network."""
-        h = self.conv1(graph, in_feat)
+        h, x = self.conv1(graph, h, x, e)
         h = relu(h)
-        h = self.conv2(graph, h)
-        return h
+        h, x = self.conv2(graph, h, x, e)
+        return h, x
 
     def training_step(self, graph, batch_idx):
         """Lightning calls this inside the training loop."""
-        features = graph.ndata['feat']
+        h = graph.ndata['feat']
+        # x = graph.ndata['x']  # TODO: Reinstate when using a dataset containing node coordinates
+        x = torch.randn(1, 16, 3)  # Create random coords for Cora
         labels = graph.ndata['label']
         train_mask = graph.ndata['train_mask']
         val_mask = graph.ndata['val_mask']
         test_mask = graph.ndata['test_mask']
 
         # Make a forward pass through the network
-        logits = self.forward(graph, features)
+        h = self.forward(graph, h, x)
 
         # Construct prediction
-        pred = logits.argmax(1)
+        pred = h.argmax(1)
 
         # Calculate the loss - Note that you should only compute the losses of the nodes in the training set
-        cross_entropy = self.cross_entropy(logits[train_mask], labels[train_mask])
+        cross_entropy = self.cross_entropy(h[train_mask], labels[train_mask])
 
         # Compute accuracy on training/validation/test
         train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
@@ -169,8 +174,8 @@ def cli_main():
     trainer.min_epochs = args.num_epochs
 
     # Logging all args to wandb
-    logger = construct_wandb_pl_logger(args)
-    trainer.logger = logger
+    # logger = construct_wandb_pl_logger(args)
+    # trainer.logger = logger
 
     trainer.fit(lit_egnn, train_dataloader=train_dataloader)
 

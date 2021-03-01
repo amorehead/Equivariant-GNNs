@@ -282,4 +282,3 @@ def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
     G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
     G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
     return G
-
