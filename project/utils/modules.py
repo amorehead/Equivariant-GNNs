@@ -7,8 +7,10 @@ import torch
 import torch.nn as nn
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 from dgl.nn.pytorch.softmax import edge_softmax
+from einops import rearrange, repeat
 from packaging import version
-from torch import Tensor
+from torch import Tensor, einsum
+from torch.nn import SiLU
 
 from project.utils.fibers import Fiber, fiber2head
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, get_spherical_from_cartesian_torch, \
@@ -687,14 +689,6 @@ class GMaxPooling(nn.Module):
 # Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
-class Swish(nn.Module):
-    def forward(self, x):
-        return x * x.sigmoid()
-
-
-SiLU = nn.SiLU if hasattr(nn, 'SiLU') else Swish
-
-
 class GConvEn(nn.Module):
     """A graph neural network layer as a DGL module.
 
@@ -715,26 +709,15 @@ class GConvEn(nn.Module):
         edge_feat : int
             Edge feature size.
         fourier_feat : int
-            Number of Fourier features to use.
+            Fourier feature size.
         """
         super().__init__()
         self.node_feat = node_feat
         self.coord_feat = coord_feat
         self.edge_feat = edge_feat
         self.fourier_feat = fourier_feat
+
         self.edge_input_size = (self.fourier_feat * 2) + (self.node_feat * 2) + (self.edge_feat + 1)
-
-        self.node_mlp = nn.Sequential(
-            nn.Linear(self.node_feat + self.coord_feat, self.node_feat * 2),
-            SiLU(),
-            nn.Linear(self.node_feat * 2, self.node_feat),
-        )
-
-        self.coors_mlp = nn.Sequential(
-            nn.Linear(self.coord_feat, self.coord_feat * 4),
-            SiLU(),
-            nn.Linear(self.coord_feat * 4, 1)
-        )
 
         self.edge_mlp = nn.Sequential(
             nn.Linear(self.edge_input_size, self.edge_input_size * 2),
@@ -743,8 +726,29 @@ class GConvEn(nn.Module):
             SiLU()
         )
 
+        self.coord_mlp = nn.Sequential(
+            nn.Linear(self.coord_feat, self.coord_feat * 4),
+            SiLU(),
+            nn.Linear(self.coord_feat * 4, 1)
+        )
+
+        self.node_mlp = nn.Sequential(
+            nn.Linear(self.node_feat + self.coord_feat, self.node_feat * 2),
+            SiLU(),
+            nn.Linear(self.node_feat * 2, self.node_feat),
+        )
+
     def __repr__(self):
-        return f'GConvEn(structure={self.out_feat})'
+        return f'GConvEn(structure=h{self.node_feat}-x{self.coord_feat}-e{self.edge_feat})'
+
+    def _fourier_encode_dist(self, x, num_encodings=4, include_self=True):
+        x = x.unsqueeze(-1)
+        device, dtype, orig_x = x.device, x.dtype, x
+        scales = 2 ** torch.arange(num_encodings, device=device, dtype=dtype)
+        x = x / scales
+        x = torch.cat([x.sin(), x.cos()], dim=-1)
+        x = torch.cat((x, orig_x), dim=-1) if include_self else x
+        return x
 
     @profile
     def forward(self, h: Tensor, x: Tensor, e: Tensor = None):
@@ -759,32 +763,33 @@ class GConvEn(nn.Module):
         e : Tensor
             The input edge embedding.
         """
-        b, n, d, fourier_features = *h.shape, self.fourier_features
+        b, n, d, fourier_features = *h.shape, self.fourier_feat
 
-        rel_coors = rearrange(x, 'b i d -> b i () d') - rearrange(x, 'b j d -> b () j d')
-        rel_dist = rel_coors.norm(dim=-1, keepdim=True)
+        rel_coords = rearrange(x, 'b i d -> b i () d') - rearrange(x, 'b j d -> b () j d')  # Similar to numpy.squeeze()
+        rel_dist = (rel_coords ** 2).sum(dim=-1, keepdim=True)
 
         if fourier_features > 0:
-            rel_dist = fourier_encode_dist(rel_dist, num_encodings=fourier_features)
+            rel_dist = self._fourier_encode_dist(rel_dist, num_encodings=fourier_features)
             rel_dist = rearrange(rel_dist, 'b i j () d -> b i j d')
 
         feats_i = repeat(h, 'b i d -> b i n d', n=n)
         feats_j = repeat(h, 'b j d -> b n j d', n=n)
         edge_input = torch.cat((feats_i, feats_j, rel_dist), dim=-1)
 
-        if exists(e):
+        if e is not None:
             edge_input = torch.cat((edge_input, e), dim=-1)
 
+        s = edge_input.shape
         m_ij = self.edge_mlp(edge_input)
 
-        coord_weights = self.coors_mlp(m_ij)
+        coord_weights = self.coord_mlp(m_ij)
         coord_weights = rearrange(coord_weights, 'b i j () -> b i j')
 
-        coors_out = einsum('b i j, b i j c -> b i c', coord_weights, rel_coors) + x
+        coords_out = einsum('b i j, b i j c -> b i c', coord_weights, rel_coords) + x
 
         m_i = m_ij.sum(dim=-2)
 
         node_mlp_input = torch.cat((h, m_i), dim=-1)
         node_out = self.node_mlp(node_mlp_input) + h
 
-        return node_out, coors_out
+        return node_out, coords_out
