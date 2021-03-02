@@ -11,7 +11,12 @@ from project.utils.utils import collate
 class TetrisDGLDataModule(LightningDataModule):
     """Tetris data module for DGL with PyTorch."""
 
-    def __init__(self, transform=None, fill=0, dtype=np.float32, batch_size=4, num_dataloader_workers=4, seed=42):
+    # Dataset partition instantiations
+    tetris_train = None
+    tetris_val = None
+    tetris_test = None
+
+    def __init__(self, transform=None, fill=0, dtype=np.float32, batch_size=4, num_dataloader_workers=4):
         super().__init__()
 
         # Dataset parameters
@@ -22,20 +27,22 @@ class TetrisDGLDataModule(LightningDataModule):
         # Dataset meta-parameters
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
-        self.seed = seed
-
-        # Dataset partition instantiations
-        self.tetris_train = None
-        self.tetris_val = None
-        self.tetris_test = None
 
     @property
     def num_node_features(self) -> int:
         return 1
 
     @property
+    def num_coord_features(self) -> int:
+        return 3
+
+    @property
     def num_edge_features(self) -> int:
         return 1
+
+    @property
+    def num_fourier_features(self) -> int:
+        return 0
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU

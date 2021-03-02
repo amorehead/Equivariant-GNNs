@@ -173,7 +173,7 @@ def collect_args():
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
+    parser.add_argument('--batch_size', type=int, default=1, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=100, help="Number of epochs")
@@ -200,7 +200,7 @@ def collect_args():
     # -----------------
     # Miscellaneous
     # -----------------
-    parser.add_argument('--num_workers', type=int, default=6, help="Number of data loader workers")
+    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
     parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
 
     # -----------------
@@ -282,3 +282,37 @@ def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
     G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
     G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
     return G
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code derived from egnn-pytorch (https://github.com/lucidrains/egnn-pytorch/blob/main/egnn_pytorch/utils.py):
+# -------------------------------------------------------------------------------------------------------------------------------------
+
+def fourier_encode_dist(x, num_encodings=4, include_self=True):
+    x = x.unsqueeze(-1)
+    device, dtype, orig_x = x.device, x.dtype, x
+    scales = 2 ** torch.arange(num_encodings, device=device, dtype=dtype)
+    x = x / scales
+    x = torch.cat([x.sin(), x.cos()], dim=-1)
+    x = torch.cat((x, orig_x), dim=-1) if include_self else x
+    return x
+
+
+def rot_z(gamma):
+    return torch.tensor([
+        [torch.cos(gamma), -torch.sin(gamma), 0],
+        [torch.sin(gamma), torch.cos(gamma), 0],
+        [0, 0, 1]
+    ], dtype=gamma.dtype)
+
+
+def rot_y(beta):
+    return torch.tensor([
+        [torch.cos(beta), 0, torch.sin(beta)],
+        [0, 1, 0],
+        [-torch.sin(beta), 0, torch.cos(beta)]
+    ], dtype=beta.dtype)
+
+
+def rot(alpha, beta, gamma):
+    return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)

@@ -10,8 +10,12 @@ from project.utils.utils import RandomRotation, collate
 class QM9DGLDataModule(LightningDataModule):
     """QM9 data module for DGL with PyTorch."""
 
-    def __init__(self, data_dir='datasets/QM9/QM9_data.pt', task='homo',
-                 batch_size=32, num_dataloader_workers=1, seed=42):
+    # Dataset partition instantiations
+    qm9_train = None
+    qm9_val = None
+    qm9_test = None
+
+    def __init__(self, data_dir='datasets/QM9/QM9_data.pt', task='homo', batch_size=32, num_dataloader_workers=1):
         super().__init__()
 
         # Dataset parameters
@@ -21,20 +25,22 @@ class QM9DGLDataModule(LightningDataModule):
         # Dataset meta-parameters
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
-        self.seed = seed
-
-        # Dataset partition instantiations
-        self.qm9_train = None
-        self.qm9_val = None
-        self.qm9_test = None
 
     @property
     def num_node_features(self) -> int:
         return self.qm9_train.num_atom_features
 
     @property
+    def num_coord_features(self) -> int:
+        return 0
+
+    @property
     def num_edge_features(self) -> int:
         return self.qm9_train.num_bonds
+
+    @property
+    def num_fourier_features(self) -> int:
+        return 0
 
     @property
     def std(self) -> int:

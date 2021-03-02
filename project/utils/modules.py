@@ -15,6 +15,7 @@ from torch.nn import SiLU
 from project.utils.fibers import Fiber, fiber2head
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, get_spherical_from_cartesian_torch, \
     precompute_sh
+from project.utils.utils import fourier_encode_dist
 from project.utils.utils_profiling import profile  # load before other local modules
 
 
@@ -686,7 +687,7 @@ class GMaxPooling(nn.Module):
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------
-# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
+# Following code derived from egnn-pytorch (https://github.com/lucidrains/egnn-pytorch/blob/main/egnn_pytorch/egnn_pytorch.py):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
 class GConvEn(nn.Module):
@@ -741,15 +742,6 @@ class GConvEn(nn.Module):
     def __repr__(self):
         return f'GConvEn(structure=h{self.node_feat}-x{self.coord_feat}-e{self.edge_feat})'
 
-    def _fourier_encode_dist(self, x, num_encodings=4, include_self=True):
-        x = x.unsqueeze(-1)
-        device, dtype, orig_x = x.device, x.dtype, x
-        scales = 2 ** torch.arange(num_encodings, device=device, dtype=dtype)
-        x = x / scales
-        x = torch.cat([x.sin(), x.cos()], dim=-1)
-        x = torch.cat((x, orig_x), dim=-1) if include_self else x
-        return x
-
     @profile
     def forward(self, h: Tensor, x: Tensor, e: Tensor = None):
         """Forward pass of the linear layer
@@ -769,7 +761,7 @@ class GConvEn(nn.Module):
         rel_dist = (rel_coords ** 2).sum(dim=-1, keepdim=True)
 
         if fourier_features > 0:
-            rel_dist = self._fourier_encode_dist(rel_dist, num_encodings=fourier_features)
+            rel_dist = fourier_encode_dist(rel_dist, num_encodings=fourier_features)
             rel_dist = rearrange(rel_dist, 'b i j () d -> b i j d')
 
         feats_i = repeat(h, 'b i d -> b i n d', n=n)
@@ -779,7 +771,6 @@ class GConvEn(nn.Module):
         if e is not None:
             edge_input = torch.cat((edge_input, e), dim=-1)
 
-        s = edge_input.shape
         m_ij = self.edge_mlp(edge_input)
 
         coord_weights = self.coord_mlp(m_ij)
@@ -793,3 +784,7 @@ class GConvEn(nn.Module):
         node_out = self.node_mlp(node_mlp_input) + h
 
         return node_out, coords_out
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
+# -------------------------------------------------------------------------------------------------------------------------------------

@@ -2,14 +2,13 @@ import os
 
 import pytorch_lightning as pl
 import torch
-from dgl.data import CoraGraphDataset
 from einops import rearrange
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.nn.functional import cross_entropy
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from torch.utils.data import DataLoader
 
+from project.datasets.Cora.cora_dgl_data_module import CoraDGLDataModule
 from project.utils.modules import GConvEn
 from project.utils.utils import collect_args, process_args
 
@@ -59,19 +58,20 @@ class LitEGNN(pl.LightningModule):
 
     def training_step(self, graph, batch_idx):
         """Lightning calls this inside the training loop."""
-        # h = rearrange(graph.ndata['feat'], 'n d -> () n d')
-        h = torch.randn(1, 16, 512).to(self.device)  # Create random node features for Cora
-        # x = graph.ndata['x']  # TODO: Reinstate when using a dataset containing node coordinates
-        x = torch.randn(1, 16, 3).to(self.device)  # Create random coords for Cora
-        # e = graph.edata['feat']  # TODO: Reinstate when using a dataset containing edge features
-        # e = torch.randn(1, 16, 16, 4).to(self.device)  # Create random edge features for Cora
+        h = rearrange(graph.ndata['feat'], 'n d -> () n d')
+        # h = torch.randn(1, 16, 512).to(self.device)
+        # x = graph.ndata['x']
+        x = torch.randn(1, 16, 3).to(self.device)
+        # e = graph.edata['feat']
+        e = torch.randn(1, 16, 16, 4).to(self.device)
+
         labels = graph.ndata['label']
         train_mask = graph.ndata['train_mask']
         val_mask = graph.ndata['val_mask']
         test_mask = graph.ndata['test_mask']
 
         # Make a forward pass through the network
-        h, x = self.forward(h, x)
+        h, x = self.forward(h, x, e)
 
         # Construct prediction
         pred = h.argmax(1)
@@ -114,12 +114,6 @@ class LitEGNN(pl.LightningModule):
         return [early_stop, checkpoint]
 
 
-def collate_fn(samples):
-    """A custom collate function for working with the DGL built-in CoraGraphDataset."""
-    graph = samples[0]
-    return graph
-
-
 def cli_main():
     # -----------
     # Arguments
@@ -136,19 +130,10 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    # data_module = RGDGLDataModule(batch_size=args.batch_size,
-    #                               num_dataloader_workers=args.num_workers,
-    #                               seed=args.seed)
-    # data_module.prepare_data()
-    # data_module.setup()
-
-    # Temporarily test with the Cora dataset
-    dataset = CoraGraphDataset()
-    train_dataloader = DataLoader(dataset,
-                                  batch_size=1,
-                                  shuffle=False,
-                                  num_workers=1,
-                                  collate_fn=collate_fn)
+    data_module = CoraDGLDataModule(batch_size=args.batch_size,
+                                    num_dataloader_workers=args.num_workers)
+    data_module.prepare_data()
+    data_module.setup()
 
     # ------------
     # Checkpoint
@@ -162,16 +147,20 @@ def cli_main():
         # Model
         # -----------
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
-        lit_egnn = LitEGNN(node_feat=dataset[0].ndata['feat'].shape[1],
-                           coord_feat=16,
-                           edge_feat=0,
-                           fourier_feat=0,
-                           num_classes=dataset.num_classes,
-                           num_layers=args.num_layers,
-                           num_channels=args.num_channels,
-                           pooling=args.pooling,
-                           lr=args.lr,
-                           num_epochs=args.num_epochs)
+        lit_egnn = LitEGNN(
+            node_feat=data_module.num_node_features,
+            # node_feat=512,
+            # coord_feat=data_module.num_coord_features,
+            coord_feat=3,
+            # edge_feat=data_module.num_edge_features,
+            edge_feat=4,
+            fourier_feat=data_module.num_fourier_features,
+            num_classes=data_module.cora_graph_dataset.num_classes,
+            num_layers=args.num_layers,
+            num_channels=args.num_channels,
+            pooling=args.pooling,
+            lr=args.lr,
+            num_epochs=args.num_epochs)
 
     # -----------
     # Training
@@ -183,7 +172,7 @@ def cli_main():
     # logger = construct_wandb_pl_logger(args)
     # trainer.logger = logger
 
-    trainer.fit(lit_egnn, train_dataloader=train_dataloader)
+    trainer.fit(lit_egnn, datamodule=data_module)
 
     # -----------
     # Testing
