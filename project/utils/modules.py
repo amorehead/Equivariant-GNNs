@@ -785,6 +785,130 @@ class GConvEn(nn.Module):
 
         return node_out, coords_out
 
+
+class GConvEnSparse(nn.Module):
+    """A sparse graph neural network layer as a DGL module.
+
+    GConvEnSparse stands for a sparse Graph Convolution E(n)-equivariant layer.
+    It is the equivalent of a linear layer in an MLP, a conv layer in a CNN, or
+    a graph conv layer in a GCN. This type of layer will scale more smoothly to
+    larger quantities of graph nodes.
+    """
+
+    def __init__(self, node_feat: int, pos_feat: int = 3, coord_feat: int = 16,
+                 edge_feat: int = 0, fourier_feat: int = 0):
+        """Sparse E(n)-equivariant Graph Conv Layer
+
+        Parameters
+        ----------
+        node_feat : int
+            Node feature size.
+        pos_feat : int
+            Position feature size.
+        coord_feat : int
+            Coordinates feature size.
+        edge_feat : int
+            Edge feature size.
+        fourier_feat : int
+            Fourier feature size.
+        """
+        super().__init__()
+        self.node_feat = node_feat
+        self.pos_feat = pos_feat
+        self.coord_feat = coord_feat
+        self.edge_feat = edge_feat
+        self.fourier_feat = fourier_feat
+
+        self.edge_input_size = (self.fourier_feat * 2) + (self.node_feat * 2) + (self.edge_feat + 1)
+
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(self.edge_input_size, self.edge_input_size * 2),
+            SiLU(),
+            nn.Linear(self.edge_input_size * 2, self.coord_feat),
+            SiLU()
+        )
+
+        self.coord_mlp = nn.Sequential(
+            nn.Linear(self.coord_feat, self.coord_feat * 4),
+            SiLU(),
+            nn.Linear(self.coord_feat * 4, 1)
+        )
+
+        self.node_mlp = nn.Sequential(
+            nn.Linear(self.node_feat + self.coord_feat, self.node_feat * 2),
+            SiLU(),
+            nn.Linear(self.node_feat * 2, self.node_feat),
+        )
+
+    def __repr__(self):
+        return f'GConvEnSparse(structure=h{self.node_feat}-x{self.coord_feat}-e{self.edge_feat})'
+
+    @profile
+    def forward(self, x: Tensor, edge_index: Tensor, edge_attr: Tensor = None) -> Tensor:
+        """Forward pass of the linear layer
+
+        Parameters
+        ----------
+        x : Tensor
+            The input node embedding.
+        edge_index : Tensor
+            The input coordinates.
+        edge_attr : Tensor
+            The input edge embeddings.
+        """
+        coords, x = x[:, :self.pos_feat], x[:, self.pos_feat:]
+
+        rel_coors = coords[edge_index[0]] - coords[edge_index[1]]
+        rel_dist = (rel_coors ** 2).sum(dim=-1, keepdim=True)
+
+        if self.fourier_features > 0:
+            rel_dist = fourier_encode_dist(rel_dist, num_encodings=self.fourier_features)
+
+        if edge_attr is not None:
+            edge_attr = torch.cat([edge_attr, rel_dist], dim=-1)
+        else:
+            edge_attr = rel_dist
+
+        coors_out, hidden_out = self.propagate(edge_index, x=x, edge_attr=edge_attr,
+                                               coords=coords, rel_coords=rel_coors)
+        return torch.cat([coors_out, hidden_out], dim=-1)
+
+    def message(self, x_i, x_j, edge_attr) -> Tensor:
+        m_ij = self.edge_mlp(torch.cat([x_i, x_j, edge_attr], dim=-1))
+        coor_w = self.coord_mlp(m_ij)
+        return m_ij, coor_w
+
+    def propagate(self, edge_index: Tensor, size: Tensor = None, **kwargs):
+        """The initial call to start propagating messages.
+            Args:
+            `edge_index` holds the indices of a general (sparse)
+                assignment matrix of shape :obj:`[N, M]`.
+            size (tuple, optional) if none, the size will be inferred
+                and assumed to be quadratic.
+            **kwargs: Any additional data which is needed to construct and
+                aggregate messages, and to update node embeddings.
+        """
+        size = self.__check_input__(edge_index, size)
+        coll_dict = self.__collect__(self.__user_args__,
+                                     edge_index, size, kwargs)
+        msg_kwargs = self.inspector.distribute('message', coll_dict)
+        m_ij, coord_wij = self.message(**msg_kwargs)
+        # aggregate them
+        aggr_kwargs = self.inspector.distribute('aggregate', coll_dict)
+        m_i = self.aggregate(m_ij, **aggr_kwargs)
+        coord_wi = self.aggregate(coord_wij, **aggr_kwargs)
+        coord_ri = self.aggregate(kwargs["rel_coords"], **aggr_kwargs)
+        # return tuple
+        update_kwargs = self.inspector.distribute('update', coll_dict)
+
+        node, coors = kwargs["x"], kwargs["coords"]
+        coords_out = coors + (coord_wi * coord_ri)
+
+        hidden_out = self.node_mlp(torch.cat([node, m_i], dim=-1))
+        hidden_out = hidden_out + node
+
+        return self.update((hidden_out, coords_out), **update_kwargs)
+
 # -------------------------------------------------------------------------------------------------------------------------------------
 # Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
 # -------------------------------------------------------------------------------------------------------------------------------------
