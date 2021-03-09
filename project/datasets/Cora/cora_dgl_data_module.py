@@ -27,8 +27,12 @@ class CoraDGLDataModule(LightningDataModule):
         return 1433
 
     @property
+    def num_pos_features(self) -> int:
+        return 3
+
+    @property
     def num_coord_features(self) -> int:
-        return 0
+        return 3
 
     @property
     def num_edge_features(self) -> int:

@@ -33,12 +33,16 @@ class TetrisDGLDataModule(LightningDataModule):
         return 1
 
     @property
+    def num_pos_features(self) -> int:
+        return 3
+
+    @property
     def num_coord_features(self) -> int:
         return 3
 
     @property
     def num_edge_features(self) -> int:
-        return 1
+        return 0
 
     @property
     def num_fourier_features(self) -> int:

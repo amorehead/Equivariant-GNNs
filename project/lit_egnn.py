@@ -9,22 +9,23 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from project.datasets.Cora.cora_dgl_data_module import CoraDGLDataModule
-from project.utils.modules import GConvEn
+from project.utils.modules import GConvEnSparseNetwork
 from project.utils.utils import collect_args, process_args
 
 
 class LitEGNN(pl.LightningModule):
     """An E(n)-equivariant GNN."""
 
-    def __init__(self, node_feat: int = 512, coord_feat: int = 16, edge_feat: int = 0, fourier_feat: int = 0,
-                 num_classes: int = 2, num_layers: int = 4, num_channels: int = 16, pooling: str = 'avg',
-                 lr: float = 1e-3, num_epochs: int = 5):
+    def __init__(self, node_feat: int = 512, pos_feat: int = 3, coord_feat: int = 16, edge_feat: int = 0,
+                 fourier_feat: int = 0, num_classes: int = 2, num_layers: int = 4, num_channels: int = 16,
+                 pooling: str = 'avg', lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for an EGNN."""
         super().__init__()
         self.save_hyperparameters()
 
         # Build the network
         self.node_feat = node_feat
+        self.pos_feat = pos_feat
         self.coord_feat = coord_feat
         self.edge_feat = edge_feat
         self.fourier_feat = fourier_feat
@@ -44,8 +45,10 @@ class LitEGNN(pl.LightningModule):
     def build_gnn_model(self):
         """Define the layers of a single EGNN."""
         # Marshal all equivariant layers
-        self.conv1 = GConvEn(self.node_feat, self.coord_feat, self.edge_feat, self.fourier_feat)
-        self.conv2 = GConvEn(self.node_feat, self.coord_feat, self.edge_feat, self.fourier_feat)
+        self.conv1 = GConvEnSparseNetwork(self.num_layers, self.node_feat, self.pos_feat,
+                                          self.edge_feat, self.coord_feat, self.fourier_feat)
+        self.conv2 = GConvEnSparseNetwork(self.num_layers, self.node_feat, self.pos_feat,
+                                          self.edge_feat, self.coord_feat, self.fourier_feat)
 
     # ---------------------
     # Training
@@ -61,9 +64,9 @@ class LitEGNN(pl.LightningModule):
         h = rearrange(graph.ndata['feat'], 'n d -> () n d')
         # h = torch.randn(1, 16, 512).to(self.device)
         # x = graph.ndata['x']
-        x = torch.randn(1, 16, 3).to(self.device)
+        x = torch.randn(1, h.shape[1], 3).to(self.device)
         # e = graph.edata['feat']
-        e = torch.randn(1, 16, 16, 4).to(self.device)
+        # e = torch.randn(1, 16, 16, 4).to(self.device)
 
         labels = graph.ndata['label']
         train_mask = graph.ndata['train_mask']
@@ -71,7 +74,8 @@ class LitEGNN(pl.LightningModule):
         test_mask = graph.ndata['test_mask']
 
         # Make a forward pass through the network
-        h, x = self.forward(h, x, e)
+        h, x = self.forward(h, x)
+        # h, x = self.forward(h, x, e)
 
         # Construct prediction
         pred = h.argmax(1)
@@ -150,10 +154,12 @@ def cli_main():
         lit_egnn = LitEGNN(
             node_feat=data_module.num_node_features,
             # node_feat=512,
-            # coord_feat=data_module.num_coord_features,
-            coord_feat=3,
-            # edge_feat=data_module.num_edge_features,
-            edge_feat=4,
+            pos_feat=data_module.num_pos_features,
+            # pos_feat=3,
+            coord_feat=data_module.num_coord_features,
+            # coord_feat=16,
+            edge_feat=data_module.num_edge_features,
+            # edge_feat=4,
             fourier_feat=data_module.num_fourier_features,
             num_classes=data_module.cora_graph_dataset.num_classes,
             num_layers=args.num_layers,
