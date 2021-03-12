@@ -16,9 +16,10 @@ class RGDGLDataModule(LightningDataModule):
     rg_val = None
     rg_test = None
 
-    def __init__(self, n_lb=10, n_hb=20, e_lb=10, e_hb=15, num_node_features=6, num_coord_features=3,
-                 num_edge_features=4, num_fourier_features=0, size=300, out_dim=1, train_transform=None,
-                 test_transform=rand_rot, dtype=np.float32, batch_size=4, num_dataloader_workers=4):
+    def __init__(self, n_lb=10, n_hb=20, e_lb=10, e_hb=15, num_node_features=6, num_pos_features=3,
+                 num_coord_features=3, num_edge_features=4, num_fourier_features=0, size=300, out_dim=1,
+                 train_transform=None, test_transform=rand_rot, dtype=np.float32, batch_size=4,
+                 num_dataloader_workers=4):
         super().__init__()
 
         # Dataset parameters
@@ -27,6 +28,7 @@ class RGDGLDataModule(LightningDataModule):
         self.e_lb = e_lb
         self.e_hb = e_hb
         self.num_node_features = num_node_features
+        self.num_pos_features = num_pos_features
         self.num_coord_features = num_coord_features
         self.num_edge_features = num_edge_features
         self.num_fourier_features = num_fourier_features

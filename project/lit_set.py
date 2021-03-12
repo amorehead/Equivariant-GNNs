@@ -10,7 +10,7 @@ from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_wandb_pl_logger
+from project.utils.utils import collect_args, process_args, get_basis_and_r
 
 
 class LitSET(pl.LightningModule):
@@ -188,13 +188,12 @@ def cli_main():
     # args.distributed_backend = 'ddp'
     # args.plugins = 'ddp_sharded'
     args.gpus = 1
+    args.precision = 16
 
     # -----------
     # Data
     # -----------
-    data_module = RGDGLDataModule(batch_size=args.batch_size,
-                                  num_dataloader_workers=args.num_workers,
-                                  seed=args.seed)
+    data_module = RGDGLDataModule(batch_size=args.batch_size, num_dataloader_workers=args.num_workers)
     data_module.prepare_data()
     data_module.setup()
 
@@ -229,8 +228,8 @@ def cli_main():
     trainer.min_epochs = args.num_epochs
 
     # Logging all args to wandb
-    logger = construct_wandb_pl_logger(args)
-    trainer.logger = logger
+    # logger = construct_wandb_pl_logger(args)
+    # trainer.logger = logger
 
     trainer.fit(lit_set, datamodule=data_module)
 

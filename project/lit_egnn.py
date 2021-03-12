@@ -4,12 +4,13 @@ import pytorch_lightning as pl
 import torch
 from einops import rearrange
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from torch.nn import ModuleList
 from torch.nn.functional import cross_entropy
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from project.datasets.Cora.cora_dgl_data_module import CoraDGLDataModule
-from project.utils.modules import GConvEnSparseNetwork
+from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
+from project.utils.modules import GConvEn
 from project.utils.utils import collect_args, process_args
 
 
@@ -17,8 +18,8 @@ class LitEGNN(pl.LightningModule):
     """An E(n)-equivariant GNN."""
 
     def __init__(self, node_feat: int = 512, pos_feat: int = 3, coord_feat: int = 16, edge_feat: int = 0,
-                 fourier_feat: int = 0, num_classes: int = 2, num_layers: int = 4, num_channels: int = 16,
-                 pooling: str = 'avg', lr: float = 1e-3, num_epochs: int = 5):
+                 fourier_feat: int = 0, num_nearest_neighbors: int = 3, num_classes: int = 2, num_layers: int = 4,
+                 lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for an EGNN."""
         super().__init__()
         self.save_hyperparameters()
@@ -29,74 +30,52 @@ class LitEGNN(pl.LightningModule):
         self.coord_feat = coord_feat
         self.edge_feat = edge_feat
         self.fourier_feat = fourier_feat
+        self.num_nearest_neighbors = num_nearest_neighbors
         self.num_classes = num_classes
         self.num_layers = num_layers
-        self.num_channels = num_channels
-        self.pooling = pooling
         self.lr = lr
         self.num_epochs = num_epochs
 
         # Assemble the layers of the network
-        self.build_gnn_model()
+        self.build_gcn_model()
 
         # Declare loss function(s) for training, validation, and testing
         self.cross_entropy = cross_entropy
 
-    def build_gnn_model(self):
+    def build_gcn_model(self):
         """Define the layers of a single EGNN."""
         # Marshal all equivariant layers
-        self.conv1 = GConvEnSparseNetwork(self.num_layers, self.node_feat, self.pos_feat,
-                                          self.edge_feat, self.coord_feat, self.fourier_feat)
-        self.conv2 = GConvEnSparseNetwork(self.num_layers, self.node_feat, self.pos_feat,
-                                          self.edge_feat, self.coord_feat, self.fourier_feat)
+        self.conv_block = ModuleList([GConvEn(self.num_layers, self.node_feat, self.pos_feat,
+                                              self.edge_feat, self.coord_feat, self.fourier_feat,
+                                              num_nearest_neighbors=self.num_nearest_neighbors)
+                                      for _ in range(self.num_layers)])
 
     # ---------------------
     # Training
     # ---------------------
     def forward(self, h, x, e=None):
         """Make a forward pass through the entire network."""
-        h, x = self.conv1(h, x, e)
-        h, x = self.conv2(h, x, e)
+        for layer in self.conv_block:
+            h, x = layer(h, x, e)
         return h, x
 
-    def training_step(self, graph, batch_idx):
+    def training_step(self, graph_and_labels, batch_idx):
         """Lightning calls this inside the training loop."""
-        h = rearrange(graph.ndata['feat'], 'n d -> () n d')
-        # h = torch.randn(1, 16, 512).to(self.device)
-        # x = graph.ndata['x']
+        h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
         x = torch.randn(1, h.shape[1], 3).to(self.device)
-        # e = graph.edata['feat']
-        # e = torch.randn(1, 16, 16, 4).to(self.device)
-
-        labels = graph.ndata['label']
-        train_mask = graph.ndata['train_mask']
-        val_mask = graph.ndata['val_mask']
-        test_mask = graph.ndata['test_mask']
+        labels = graph_and_labels[1]
 
         # Make a forward pass through the network
         h, x = self.forward(h, x)
         # h, x = self.forward(h, x, e)
 
-        # Construct prediction
-        pred = h.argmax(1)
-
-        # Calculate the loss - Note that you should only compute the losses of the nodes in the training set
-        cross_entropy = self.cross_entropy(h[train_mask], labels[train_mask])
-
-        # Compute accuracy on training/validation/test
-        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
-        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
-        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+        # Calculate the loss
+        cross_entropy = self.cross_entropy(h, labels)
 
         # Log training metrics
         self.log('cross_entropy', cross_entropy)
-        self.log('train_acc', train_acc)
-        self.log('val_acc', val_acc)
-        self.log('test_acc', test_acc)
 
-        # Assemble and return the training step output
-        output = {'loss': cross_entropy}  # The loss key here is required
-        return output
+        return cross_entropy
 
     # ---------------------
     # Training Setup
@@ -130,12 +109,12 @@ def cli_main():
     # args.distributed_backend = 'ddp'
     # args.plugins = 'ddp_sharded'
     args.gpus = 1
+    args.precision = 16
 
     # -----------
     # Data
     # -----------
-    data_module = CoraDGLDataModule(batch_size=args.batch_size,
-                                    num_dataloader_workers=args.num_workers)
+    data_module = RGDGLDataModule(batch_size=args.batch_size, num_dataloader_workers=args.num_workers)
     data_module.prepare_data()
     data_module.setup()
 
@@ -153,18 +132,13 @@ def cli_main():
         print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
         lit_egnn = LitEGNN(
             node_feat=data_module.num_node_features,
-            # node_feat=512,
             pos_feat=data_module.num_pos_features,
-            # pos_feat=3,
             coord_feat=data_module.num_coord_features,
-            # coord_feat=16,
             edge_feat=data_module.num_edge_features,
-            # edge_feat=4,
             fourier_feat=data_module.num_fourier_features,
-            num_classes=data_module.cora_graph_dataset.num_classes,
+            num_nearest_neighbors=args.num_nearest_neighbors,
+            num_classes=data_module.rg_train.out_dim,
             num_layers=args.num_layers,
-            num_channels=args.num_channels,
-            pooling=args.pooling,
             lr=args.lr,
             num_epochs=args.num_epochs)
 

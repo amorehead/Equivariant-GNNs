@@ -161,7 +161,7 @@ def collect_args():
     # -----------------
     # Model parameters
     # -----------------
-    parser.add_argument('--num_layers', type=int, default=7, help="Number of equivariant layers")
+    parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
     parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
     parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
     parser.add_argument('--num_nlayers', type=int, default=0, help="Number of layers for nonlinearity")
@@ -169,6 +169,7 @@ def collect_args():
     parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
     parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
     parser.add_argument('--head', type=int, default=8, help="Number of attention heads")
+    parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
 
     # -----------------
     # Meta-parameters
@@ -236,11 +237,6 @@ def process_args(args, unparsed_argv):
     if not args.seed:
         args.seed = 42  # np.random.randint(100000)
     pl.seed_everything(args.seed)
-
-    # ---------------------------------------
-    # Automatically choosing GPU if possible
-    # ---------------------------------------
-    args.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
     print("\n\nargs:", args)
     print("unparsed_argv:", unparsed_argv, "\n\n")

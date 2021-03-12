@@ -1,9 +1,9 @@
 # Equivariant-GNNs requirements
 setuptools==53.0.0
 click==7.1.2
-wandb==0.10.20
+wandb==0.10.22
 # numpy==1.19.4
-pytorch-lightning==1.2.1
+pytorch-lightning==1.2.3
 einops==0.3.0
 
 # SE(3)-Transformer requirements
