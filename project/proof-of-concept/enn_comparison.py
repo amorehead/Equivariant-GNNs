@@ -50,6 +50,7 @@ g.ndata['f'] = feats[0, :, :].view(32, 16, 1)
 g.edata['d'] = g.ndata['x'][g.edges()[0]] - g.ndata['x'][g.edges()[1]]
 g.edata['w'] = edge_f[0, :, :]
 output1 = None
+h_output1 = None
 num_steps = 10
 
 # Test original SE(3)-Transformer (by Fabian Fuchs et al.)
@@ -80,9 +81,9 @@ print(
 edge_f = edge_f.view(32, 32, 3)
 t1 = time.time()
 for i in range(num_steps):
-    output1, x = open_source_egnn(feats, coors)
+    h_output1, x_output1 = open_source_egnn(feats, coors)
 t2 = time.time()
-output2 = new_se3_transformer(feats, coors @ R)
-diff = (output1 - output2).max()
+h_output2, x_output2 = open_source_egnn(feats, coors @ R)
+diff = (h_output1 - h_output2).max()
 print(
     f'The open-source EGNN, with an equivariance error of {str(diff)}, takes {str(t2 - t1)} seconds to perform {num_steps} forward passes.')
