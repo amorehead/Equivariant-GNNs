@@ -610,10 +610,10 @@ class GSE3Res(nn.Module):
 ### Helper and wrapper functions
 
 class GSum(nn.Module):
-    """SE(3)-equvariant graph residual sum function."""
+    """SE(3)-equivariant graph residual sum function."""
 
     def __init__(self, f_x: Fiber, f_y: Fiber):
-        """SE(3)-equvariant graph residual sum function.
+        """SE(3)-equivariant graph residual sum function.
         Args:
             f_x: Fiber() object for fiber of summands
             f_y: Fiber() object for fiber of summands
