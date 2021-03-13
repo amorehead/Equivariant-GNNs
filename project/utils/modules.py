@@ -729,6 +729,7 @@ class GConvEn(nn.Module):
         edge_input_dim = (fourier_feat * 2) + (node_feat * 2) + edge_feat + 1
         dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
+        # torch.Size([1, 32, 3, 33])
         self.edge_mlp = nn.Sequential(
             nn.Linear(edge_input_dim, edge_input_dim * 2),
             dropout,

@@ -45,8 +45,8 @@ class LitEGNN(pl.LightningModule):
     def build_gcn_model(self):
         """Define the layers of a single EGNN."""
         # Marshal all equivariant layers
-        self.conv_block = ModuleList([GConvEn(self.num_layers, self.node_feat, self.pos_feat,
-                                              self.edge_feat, self.coord_feat, self.fourier_feat,
+        self.conv_block = ModuleList([GConvEn(node_feat=self.node_feat, edge_feat=self.edge_feat,
+                                              coord_feat=self.coord_feat, fourier_feat=self.fourier_feat,
                                               num_nearest_neighbors=self.num_nearest_neighbors)
                                       for _ in range(self.num_layers)])
 
