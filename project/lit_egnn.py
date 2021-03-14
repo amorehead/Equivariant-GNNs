@@ -5,11 +5,11 @@ import torch
 from einops import rearrange
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.nn import ModuleList
-from torch.nn.functional import cross_entropy
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
+from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GConvEn
 from project.utils.utils import collect_args, process_args
 
@@ -40,7 +40,8 @@ class LitEGNN(pl.LightningModule):
         self.build_gcn_model()
 
         # Declare loss function(s) for training, validation, and testing
-        self.cross_entropy = cross_entropy
+        self.L1Loss = L1Loss(1, 0, 'homo')
+        self.L2Loss = L2Loss()
 
     def build_gcn_model(self):
         """Define the layers of a single EGNN."""
@@ -63,19 +64,22 @@ class LitEGNN(pl.LightningModule):
         """Lightning calls this inside the training loop."""
         h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
         x = torch.randn(1, h.shape[1], 3).to(self.device)
-        labels = graph_and_labels[1]
+        y = graph_and_labels[1]
 
         # Make a forward pass through the network
         h, x = self.forward(h, x)
         # h, x = self.forward(h, x, e)
 
         # Calculate the loss
-        cross_entropy = self.cross_entropy(h, labels)
+        l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
+        l2_loss = self.L2Loss(h, y)
 
         # Log training metrics
-        self.log('cross_entropy', cross_entropy)
+        self.log('train_l1_loss', l1_loss)
+        self.log('train_rescaled_l1_loss', rescaled_l1_loss)
+        self.log('train_l2_loss', l2_loss)
 
-        return cross_entropy
+        return l1_loss
 
     # ---------------------
     # Training Setup
@@ -84,7 +88,7 @@ class LitEGNN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'test_acc'
+        metric_to_track = 'train_l1_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -92,8 +96,8 @@ class LitEGNN(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="test_acc", mode="max")
-        checkpoint = ModelCheckpoint(monitor="test_acc", save_top_k=3)
+        early_stop = EarlyStopping(monitor="train_l1_loss", mode="max")
+        checkpoint = ModelCheckpoint(monitor="train_l1_loss", save_top_k=3)
         return [early_stop, checkpoint]
 
 
@@ -109,7 +113,6 @@ def cli_main():
     # args.distributed_backend = 'ddp'
     # args.plugins = 'ddp_sharded'
     args.gpus = 1
-    args.precision = 16
 
     # -----------
     # Data
@@ -134,7 +137,7 @@ def cli_main():
             node_feat=data_module.num_node_features,
             pos_feat=data_module.num_pos_features,
             coord_feat=data_module.num_coord_features,
-            edge_feat=data_module.num_edge_features,
+            edge_feat=0,
             fourier_feat=data_module.num_fourier_features,
             num_nearest_neighbors=args.num_nearest_neighbors,
             num_classes=data_module.rg_train.out_dim,

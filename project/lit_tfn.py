@@ -158,7 +158,7 @@ class LitTFN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'val_rescaled_l1_loss'
+        metric_to_track = 'train_l2_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -166,8 +166,8 @@ class LitTFN(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="max")
-        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=1)
+        early_stop = EarlyStopping(monitor="train_l2_loss", mode="max")
+        checkpoint = ModelCheckpoint(monitor="train_l2_loss", save_top_k=1)
         return [early_stop, checkpoint]
 
 
@@ -183,7 +183,6 @@ def cli_main():
     # args.distributed_backend = 'ddp'
     # args.plugins = 'ddp_sharded'
     args.gpus = 1
-    args.precision = 16
 
     # -----------
     # Data

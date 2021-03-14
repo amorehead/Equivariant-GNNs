@@ -170,7 +170,6 @@ def cli_main():
     # args.distributed_backend = 'ddp'
     # args.plugins = 'ddp_sharded'
     args.gpus = 1
-    args.precision = 16
 
     # -----------
     # Data
