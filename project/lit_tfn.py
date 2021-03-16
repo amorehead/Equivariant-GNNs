@@ -122,9 +122,9 @@ class LitTFN(pl.LightningModule):
         l2_loss = self.L2Loss(logits, y)
 
         # Log validation metrics
-        self.log('val_l1_loss', l1_loss)
-        self.log('val_rescaled_l1_loss', rescaled_l1_loss)
-        self.log('val_l2_loss', l2_loss)
+        self.log('val_l1_loss', l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('val_rescaled_l1_loss', rescaled_l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('val_l2_loss', l2_loss, on_step=True, on_epoch=True, sync_dist=True)
 
         # Assemble and return the validation step output
         output = {'loss': rescaled_l1_loss}  # The loss key here is required
@@ -143,9 +143,9 @@ class LitTFN(pl.LightningModule):
         l2_loss = self.L2Loss(logits, y)
 
         # Log test metrics
-        self.log('test_l1_loss', l1_loss)
-        self.log('test_rescaled_l1_loss', rescaled_l1_loss)
-        self.log('test_l2_loss', l2_loss)
+        self.log('test_l1_loss', l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_rescaled_l1_loss', rescaled_l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_l2_loss', l2_loss, on_step=True, on_epoch=True, sync_dist=True)
 
         # Assemble and return the test step output
         output = {'loss': rescaled_l1_loss}  # The loss key here is required
@@ -158,7 +158,7 @@ class LitTFN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'train_l2_loss'
+        metric_to_track = 'val_rescaled_l1_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -166,8 +166,8 @@ class LitTFN(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="train_l2_loss", mode="max")
-        checkpoint = ModelCheckpoint(monitor="train_l2_loss", save_top_k=1)
+        early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="min")
+        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3)
         return [early_stop, checkpoint]
 
 
@@ -179,10 +179,8 @@ def cli_main():
     process_args(args, unparsed_argv)
 
     # Define HPC-specific properties in-file
-    # args.accelerator = 'ddp'
-    # args.distributed_backend = 'ddp'
-    # args.plugins = 'ddp_sharded'
-    args.gpus = 1
+    # args.accelerator, args.distributed_backend = 'ddp', 'ddp'
+    args.gpus, args.num_nodes = 1, 1
 
     # -----------
     # Data

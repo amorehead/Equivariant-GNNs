@@ -81,6 +81,48 @@ class LitEGNN(pl.LightningModule):
 
         return l1_loss
 
+    def validation_step(self, graph_and_labels, batch_idx):
+        """Lightning calls this inside the validation loop."""
+        h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
+        x = torch.randn(1, h.shape[1], 3).to(self.device)
+        y = graph_and_labels[1]
+
+        # Make a forward pass through the network
+        h, x = self.forward(h, x)
+        # h, x = self.forward(h, x, e)
+
+        # Calculate the loss
+        l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
+        l2_loss = self.L2Loss(h, y)
+
+        # Log training metrics
+        self.log('val_l1_loss', l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('val_rescaled_l1_loss', rescaled_l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('val_l2_loss', l2_loss, on_step=True, on_epoch=True, sync_dist=True)
+
+        return rescaled_l1_loss
+
+    def test_step(self, graph_and_labels, batch_idx):
+        """Lightning calls this inside the testing loop."""
+        h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
+        x = torch.randn(1, h.shape[1], 3).to(self.device)
+        y = graph_and_labels[1]
+
+        # Make a forward pass through the network
+        h, x = self.forward(h, x)
+        # h, x = self.forward(h, x, e)
+
+        # Calculate the loss
+        l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
+        l2_loss = self.L2Loss(h, y)
+
+        # Log training metrics
+        self.log('test_l1_loss', l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_rescaled_l1_loss', rescaled_l1_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_l2_loss', l2_loss, on_step=True, on_epoch=True, sync_dist=True)
+
+        return rescaled_l1_loss
+
     # ---------------------
     # Training Setup
     # ---------------------
@@ -88,7 +130,7 @@ class LitEGNN(pl.LightningModule):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
         scheduler = CosineAnnealingWarmRestarts(optimizer, self.num_epochs, eta_min=1e-4)
-        metric_to_track = 'train_l1_loss'
+        metric_to_track = 'val_rescaled_l1_loss'
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -96,8 +138,8 @@ class LitEGNN(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="train_l1_loss", mode="max")
-        checkpoint = ModelCheckpoint(monitor="train_l1_loss", save_top_k=3)
+        early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="min")
+        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3)
         return [early_stop, checkpoint]
 
 
@@ -109,10 +151,8 @@ def cli_main():
     process_args(args, unparsed_argv)
 
     # Define HPC-specific properties in-file
-    # args.accelerator = 'ddp'
-    # args.distributed_backend = 'ddp'
-    # args.plugins = 'ddp_sharded'
-    args.gpus = 1
+    # args.accelerator, args.distributed_backend = 'ddp', 'ddp'
+    args.gpus, args.num_nodes = 1, 1
 
     # -----------
     # Data

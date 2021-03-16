@@ -115,7 +115,7 @@ class LitMCSET(pl.LightningModule):
         accuracy = self.accuracy(logits, y)
 
         # Log validation metrics
-        self.log('val_accuracy', accuracy)
+        self.log('val_accuracy', accuracy, on_step=True, on_epoch=True, sync_dist=True)
 
         # Assemble and return the validation step output
         output = {'loss': accuracy}  # The loss key here is required
@@ -132,7 +132,7 @@ class LitMCSET(pl.LightningModule):
         accuracy = self.accuracy(logits, y)
 
         # Log test metrics
-        self.log('test_accuracy', accuracy)
+        self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, sync_dist=True)
 
         # Assemble and return the test step output
         output = {'loss': accuracy}  # The loss key here is required
@@ -154,7 +154,7 @@ class LitMCSET(pl.LightningModule):
 
     def configure_callbacks(self):
         early_stop = EarlyStopping(monitor="val_accuracy", mode="max")
-        checkpoint = ModelCheckpoint(monitor="val_accuracy", save_top_k=1)
+        checkpoint = ModelCheckpoint(monitor="val_accuracy", save_top_k=3)
         return [early_stop, checkpoint]
 
 
@@ -166,10 +166,8 @@ def cli_main():
     process_args(args, unparsed_argv)
 
     # Define HPC-specific properties in-file
-    # args.accelerator = 'ddp'
-    # args.distributed_backend = 'ddp'
-    # args.plugins = 'ddp_sharded'
-    args.gpus = 1
+    # args.accelerator, args.distributed_backend = 'ddp', 'ddp'
+    args.gpus, args.num_nodes = 1, 1
 
     # -----------
     # Data
