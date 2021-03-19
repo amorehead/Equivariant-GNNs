@@ -124,10 +124,9 @@ lightning_logs/
 MNIST
 .DS_Store
 
-# WandB
-project/models
+# Neptune
+project/models/**
 project/DeepInteract
-project/wandb
 
 # QM9
 project/datasets/QM9/QM9_data.pt
