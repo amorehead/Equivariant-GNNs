@@ -4,7 +4,7 @@ from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
+from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
@@ -185,7 +185,7 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    data_module = RGDGLDataModule(batch_size=args.batch_size, num_dataloader_workers=args.num_workers)
+    data_module = QM9DGLDataModule(batch_size=args.batch_size, num_dataloader_workers=args.num_workers)
     data_module.prepare_data()
     data_module.setup()
 
@@ -223,8 +223,8 @@ def cli_main():
     # -----------
     # Testing
     # -----------
-    rg_test_results = trainer.test()
-    print(f'Model testing results on dataset: {rg_test_results}\n')
+    test_results = trainer.test()
+    print(f'Model testing results on dataset: {test_results}\n')
 
 
 if __name__ == '__main__':

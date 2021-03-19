@@ -87,7 +87,6 @@ class LitEGNN(pl.LightningModule):
 
         # Make a forward pass through the network
         h, x = self.forward(h, x)
-        # h, x = self.forward(h, x, e)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
@@ -108,7 +107,6 @@ class LitEGNN(pl.LightningModule):
 
         # Make a forward pass through the network
         h, x = self.forward(h, x)
-        # h, x = self.forward(h, x, e)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
@@ -194,8 +192,8 @@ def cli_main():
     # -----------
     # Testing
     # -----------
-    # rg_test_results = trainer.test()
-    # print(f'Model testing results on dataset: {rg_test_results}\n')
+    test_results = trainer.test()
+    print(f'Model testing results on dataset: {test_results}\n')
 
 
 if __name__ == '__main__':
