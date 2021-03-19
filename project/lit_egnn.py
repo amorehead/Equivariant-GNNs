@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.metrics import L1Loss, L2Loss
-from project.utils.modules import GConvEn
+from project.utils.modules import EnGraphConv
 from project.utils.utils import collect_args, process_args, construct_neptune_pl_logger
 
 
@@ -45,9 +45,9 @@ class LitEGNN(pl.LightningModule):
     def build_gcn_model(self):
         """Define the layers of a single EGNN."""
         # Marshal all equivariant layers
-        self.conv_block = ModuleList([GConvEn(node_feat=self.node_feat, edge_feat=self.edge_feat,
-                                              coord_feat=self.coord_feat, fourier_feat=self.fourier_feat,
-                                              num_nearest_neighbors=self.num_nearest_neighbors)
+        self.conv_block = ModuleList([EnGraphConv(node_feat=self.node_feat, edge_feat=self.edge_feat,
+                                                  coord_feat=self.coord_feat, fourier_feat=self.fourier_feat,
+                                                  num_nearest_neighbors=self.num_nearest_neighbors)
                                       for _ in range(self.num_layers)])
 
     # ---------------------
