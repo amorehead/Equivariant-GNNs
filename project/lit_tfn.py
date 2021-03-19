@@ -192,11 +192,11 @@ def cli_main():
     # Model
     # -----------
     lit_tfn = LitTFN(num_layers=args.num_layers,
-                     atom_feature_size=args.num_node_features,
+                     atom_feature_size=data_module.num_node_features,
                      num_channels=args.num_channels,
                      num_nlayers=args.num_nlayers,
                      num_degrees=args.num_degrees,
-                     edge_dim=args.num_edge_features,
+                     edge_dim=data_module.num_node_features,
                      lr=args.lr,
                      num_epochs=args.num_epochs,
                      std=data_module.std,

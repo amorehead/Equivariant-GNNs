@@ -147,7 +147,7 @@ class QM9DGLDataset(Dataset):
         w = self.to_one_hot(w, self.num_bonds).astype(DTYPE)
 
         # Create graph
-        G = dgl.DGLGraph((src, dst))
+        G = dgl.graph((src, dst))
 
         # Add node features to graph
         G.ndata['x'] = torch.tensor(x)  # [num_atoms,3]

@@ -257,7 +257,7 @@ def collect_args():
     parser.add_argument('--batch_size', type=int, default=1, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
-    parser.add_argument('--num_epochs', type=int, default=3, help="Number of epochs")
+    parser.add_argument('--num_epochs', type=int, default=5, help="Number of epochs")
     parser.add_argument('--save_dir', type=str, default="models", help="Directory in which to save models")
 
     # -----------------
