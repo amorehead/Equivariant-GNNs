@@ -248,13 +248,13 @@ def collect_args():
     parser.add_argument('--fully_connected', action='store_true', default=False, help="Include global node in graph")
     parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
     parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
-    parser.add_argument('--head', type=int, default=8, help="Number of attention heads")
+    parser.add_argument('--head', type=int, default=1, help="Number of attention heads")
     parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
 
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--batch_size', type=int, default=1, help="Batch size")
+    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=5, help="Number of epochs")
@@ -271,7 +271,7 @@ def collect_args():
     # -----------------
     # Logging
     # -----------------
-    parser.add_argument('--model', type=str, default='LitRGSET', help="Model being used")
+    parser.add_argument('--model', type=str, default='LitSET', help="Model being used")
     parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
     parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
 

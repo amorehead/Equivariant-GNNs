@@ -36,7 +36,7 @@ class QM9DGLDataModule(LightningDataModule):
 
     @property
     def num_coord_features(self) -> int:
-        return len(self.qm9_train)
+        return 3
 
     @property
     def num_edge_features(self) -> int:

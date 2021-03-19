@@ -196,7 +196,7 @@ def cli_main():
                      num_channels=args.num_channels,
                      num_nlayers=args.num_nlayers,
                      num_degrees=args.num_degrees,
-                     edge_dim=data_module.num_node_features,
+                     edge_dim=data_module.num_edge_features,
                      lr=args.lr,
                      num_epochs=args.num_epochs,
                      std=data_module.std,
