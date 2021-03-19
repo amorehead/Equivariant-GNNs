@@ -311,6 +311,9 @@ def process_args(args, unparsed_argv):
 
 def construct_neptune_pl_logger(args):
     """Return an instance of NeptuneLogger with corresponding project and experiment name strings."""
-    return NeptuneLogger(experiment_name=args.experiment_name, project_name=args.project_name, close_after_fit=False) \
-        if args.experiment_name \
-        else NeptuneLogger(project_name=f'{args.project_name}', close_after_fit=False)
+    return NeptuneLogger(experiment_name=args.experiment_name if args.experiment_name else None,
+                         project_name=args.project_name,
+                         close_after_fit=False,
+                         params={'max_epochs': args.num_epochs, 'batch_size': args.batch_size, 'lr': args.lr},
+                         tags=['pytorch-lightning', 'graph-neural-network', 'equivariance'],
+                         upload_source_files=['*.py'])
