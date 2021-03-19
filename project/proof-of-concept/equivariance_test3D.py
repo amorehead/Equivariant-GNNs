@@ -28,9 +28,9 @@ def get_real_spherical_harmonics(x, l, m):
     _, po, az = cart2sph(x[0], x[1], x[2])
     Y = sph_harm(abs(m), l, az, po)
     if m < 0:
-        Y = np.sqrt(2) * (-1)**m * Y.imag
+        Y = np.sqrt(2) * (-1) ** m * Y.imag
     elif m > 0:
-        Y = np.sqrt(2) * (-1)**m * Y.real
+        Y = np.sqrt(2) * (-1) ** m * Y.real
     else:
         Y = Y.real
     return Y
@@ -65,9 +65,9 @@ if __name__ == "__main__":
     r, __ = np.linalg.qr(s)
 
     J = 1
-    y_J_r = np.array([get_real_spherical_harmonics(np.matmul(r,x), J , i) for i in (-1,0,1)])
-    Y_J = np.array([get_real_spherical_harmonics(x, J , i) for i in (-1,0,1)])
-    DJ_yJ = np.matmul(r,Y_J)
+    y_J_r = np.array([get_real_spherical_harmonics(np.matmul(r, x), J, i) for i in (-1, 0, 1)])
+    Y_J = np.array([get_real_spherical_harmonics(x, J, i) for i in (-1, 0, 1)])
+    DJ_yJ = np.matmul(r, Y_J)
 
     # y_J_r and DJ_yJ should be equal according to https://arxiv.org/abs/1802.08219 Section 4.1.1
     print(y_J_r)

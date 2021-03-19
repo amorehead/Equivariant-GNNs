@@ -6,7 +6,7 @@
 #BSUB -nnodes 1
 #BSUB -q batch
 #BSUB -alloc_flags "gpumps"
-#BSUB -J train_lit_set_model_with_pl
+#BSUB -J train_lit_egnn_model_with_pl
 #BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB --signal=SIGUSR1@90
@@ -32,4 +32,4 @@ export no_proxy='localhost,127.0.0.0/8,.ccs.ornl.gov,.ncrc.gov'
 
 # Run training script
 cd "$PROJDIR"/project || exit
-jsrun -r1 -g6 -a6 -c42 -bpacked:7 python lit_set.py
+jsrun -r1 -g1 -a1 -c6 --smpiargs="off" python lit_egnn.py

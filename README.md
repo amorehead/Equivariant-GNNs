@@ -91,7 +91,7 @@ Then, navigate to any file and run it:
 
  ```bash
 # Run a particular module (example: Equivariant-GNNs architecture as main contribution):
-python3 project/lit_set.py
+python3 project/lit_egnn.py
 ```
 
 ## Imports
@@ -100,11 +100,11 @@ This project is setup as a package which means you can now easily import any fil
 
 ```python
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
-from project.lit_set import LitSET
+from project.lit_egnn import LitEGNN
 from pytorch_lightning import Trainer
 
 # Model
-model = LitSET()  # Provide model parameters here
+model = LitEGNN()  # Provide model parameters here
 
 # Data
 data_dir = 'final'  # Specify data directory here

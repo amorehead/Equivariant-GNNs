@@ -1,7 +1,3 @@
-"""
-Source code originally from SE(3)-Transformer (https://github.com/FabianFuchsML/se3-transformer-public/)
-"""
-
 from typing import Dict
 
 import dgl
@@ -11,13 +7,22 @@ import torch
 import torch.nn as nn
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 from dgl.nn.pytorch.softmax import edge_softmax
+from einops import rearrange
 from packaging import version
+from torch import Tensor, einsum, broadcast_tensors
+from torch.nn import SiLU
+from torch.nn.functional import normalize
 
 from project.utils.fibers import Fiber, fiber2head
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, get_spherical_from_cartesian_torch, \
     precompute_sh
+from project.utils.utils import fourier_encode_dist, batched_index_select
 from project.utils.utils_profiling import profile  # load before other local modules
 
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code derived from SE(3)-Transformer (https://github.com/FabianFuchsML/se3-transformer-public/):
+# -------------------------------------------------------------------------------------------------------------------------------------
 
 @profile
 def get_basis(Y, max_degree):
@@ -605,10 +610,10 @@ class GSE3Res(nn.Module):
 ### Helper and wrapper functions
 
 class GSum(nn.Module):
-    """SE(3)-equvariant graph residual sum function."""
+    """SE(3)-equivariant graph residual sum function."""
 
     def __init__(self, f_x: Fiber, f_y: Fiber):
-        """SE(3)-equvariant graph residual sum function.
+        """SE(3)-equivariant graph residual sum function.
         Args:
             f_x: Fiber() object for fiber of summands
             f_y: Fiber() object for fiber of summands
@@ -680,3 +685,420 @@ class GMaxPooling(nn.Module):
     def forward(self, features, G, **kwargs):
         h = features['0'][..., -1]
         return self.pool(G, h)
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code derived from egnn-pytorch (https://github.com/lucidrains/egnn-pytorch/blob/main/egnn_pytorch/egnn_pytorch.py):
+# -------------------------------------------------------------------------------------------------------------------------------------
+
+class GConvEn(nn.Module):
+    """A graph neural network layer as a DGL module.
+
+    GConvEn stands for a Graph Convolution E(n)-equivariant layer. It is the
+    equivalent of a linear layer in an MLP, a conv layer in a CNN, or a graph
+    conv layer in a GCN.
+    """
+
+    def __init__(
+            self,
+            node_feat,
+            edge_feat=0,
+            coord_feat=16,
+            fourier_feat=0,
+            norm_rel_coors=False,
+            norm_coor_weights=False,
+            num_nearest_neighbors=0,
+            dropout=0.0
+    ):
+        """E(n)-equivariant Graph Conv Layer
+
+        Parameters
+        ----------
+        node_feat : int
+            Node feature size.
+        edge_feat : int
+            Edge feature size.
+        coord_feat : int
+            Coordinates feature size.
+        fourier_feat : int
+            Fourier feature size.
+        """
+        super().__init__()
+        self.fourier_feat = fourier_feat
+
+        edge_input_dim = (fourier_feat * 2) + (node_feat * 2) + edge_feat + 1
+        dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+
+        # torch.Size([1, 32, 3, 33])
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(edge_input_dim, edge_input_dim * 2),
+            dropout,
+            SiLU(),
+            nn.Linear(edge_input_dim * 2, coord_feat),
+            SiLU()
+        )
+
+        self.node_mlp = nn.Sequential(
+            nn.Linear(node_feat + coord_feat, node_feat * 2),
+            dropout,
+            SiLU(),
+            nn.Linear(node_feat * 2, node_feat),
+        )
+
+        self.norm_coor_weights = norm_coor_weights
+        self.norm_rel_coors = norm_rel_coors
+        if norm_rel_coors:
+            self.rel_coors_scale = nn.Parameter(torch.ones(1))
+
+        last_coor_linear = nn.Linear(coord_feat * 4, 1)
+        self.coors_mlp = nn.Sequential(
+            nn.Linear(coord_feat, coord_feat * 4),
+            dropout,
+            SiLU(),
+            last_coor_linear
+        )
+
+        # seems to be needed to keep the network from exploding to NaN with greater depths
+        last_coor_linear.weight.data.fill_(0)
+
+        self.num_nearest_neighbors = num_nearest_neighbors
+
+    def forward(self, h, x, e=None, mask=None):
+        """Forward pass of the linear layer
+
+        Parameters
+        ----------
+        h : Tensor
+            The input node embedding.
+        x : Tensor
+            The input coordinates embedding.
+        e : Tensor
+            The input edge embedding.
+        mask : Tensor
+            The coordinate mask to apply.
+        """
+        b, n, d, fourier_features, num_nearest = *h.shape, self.fourier_feat, self.num_nearest_neighbors
+        use_nearest = num_nearest > 0
+
+        rel_coors = rearrange(x, 'b i d -> b i () d') - rearrange(x, 'b j d -> b () j d')
+        rel_dist = (rel_coors ** 2).sum(dim=-1, keepdim=True)
+
+        i = j = n
+
+        if use_nearest:
+            nbhd_indices = rel_dist[..., 0].topk(num_nearest, dim=-1, largest=False).indices
+            rel_coors = batched_index_select(rel_coors, nbhd_indices, dim=2)
+            rel_dist = batched_index_select(rel_dist, nbhd_indices, dim=2)
+
+            if e is not None:
+                edges = batched_index_select(e, nbhd_indices, dim=2)
+
+            j = num_nearest
+
+        if fourier_features > 0:
+            rel_dist = fourier_encode_dist(rel_dist, num_encodings=fourier_features)
+            rel_dist = rearrange(rel_dist, 'b i j () d -> b i j d')
+
+        if use_nearest:
+            feats_j = batched_index_select(h, nbhd_indices, dim=1)
+        else:
+            feats_j = rearrange(h, 'b j d -> b () j d')
+
+        feats_i = rearrange(h, 'b i d -> b i () d')
+        feats_i, feats_j = broadcast_tensors(feats_i, feats_j)
+
+        edge_input = torch.cat((feats_i, feats_j, rel_dist), dim=-1)
+
+        if e is not None:
+            edge_input = torch.cat((edge_input, e), dim=-1)
+
+        m_ij = self.edge_mlp(edge_input)
+
+        coor_weights = self.coors_mlp(m_ij)
+        coor_weights = rearrange(coor_weights, 'b i j () -> b i j')
+
+        if self.norm_coor_weights:
+            coor_weights = coor_weights.tanh()
+
+        if self.norm_rel_coors:
+            rel_coors = normalize(rel_coors, dim=-1) * self.rel_coors_scale
+
+        if mask is not None:
+            mask_i = rearrange(mask, 'b i -> b i ()')
+
+            if use_nearest:
+                mask_j = batched_index_select(mask, nbhd_indices, dim=1)
+            else:
+                mask_j = rearrange(mask, 'b j -> b () j')
+
+            mask = mask_i * mask_j
+            coor_weights.masked_fill_(~mask, 0.)
+
+        coors_out = einsum('b i j, b i j c -> b i c', coor_weights, rel_coors) + x
+
+        m_i = m_ij.sum(dim=-2)
+
+        node_mlp_input = torch.cat((h, m_i), dim=-1)
+        node_out = self.node_mlp(node_mlp_input) + h
+
+        return node_out, coors_out
+
+    def __repr__(self):
+        return f'GConvEn(structure=h{self.node_feat}-x{self.coord_feat}-e{self.edge_feat})'
+
+
+class GConvEnSparse(nn.Module):
+    """A sparse graph neural network layer as a DGL module.
+
+    GConvEnSparse stands for a sparse Graph Convolution E(n)-equivariant layer.
+    It is the equivalent of a linear layer in an MLP, a conv layer in a CNN, or
+    a graph conv layer in a GCN. This type of layer will scale more smoothly to
+    larger quantities of graph nodes.
+    """
+
+    def __init__(self, node_feat: int, pos_feat: int = 3, edge_feat: int = 0,
+                 coord_feat: int = 16, fourier_feat: int = 0, dropout=0):
+        """Sparse E(n)-equivariant Graph Conv Layer
+
+        Parameters
+        ----------
+        node_feat : int
+            Node feature size.
+        pos_feat : int
+            Position feature size.
+        edge_feat : int
+            Edge feature size.
+        coord_feat : int
+            Coordinates feature size.
+        fourier_feat : int
+            Fourier feature size.
+        dropout : float
+            Dropout (forget) rate.
+        """
+        super().__init__()
+        self.node_feat = node_feat
+        self.pos_feat = pos_feat
+        self.edge_feat = edge_feat
+        self.coord_feat = coord_feat
+        self.fourier_feat = fourier_feat
+
+        self.edge_input_size = (self.fourier_feat * 2) + (self.node_feat * 2) + (self.edge_feat + 1)
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(self.edge_input_size, self.edge_input_size * 2),
+            self.dropout,
+            SiLU(),
+            nn.Linear(self.edge_input_size * 2, self.coord_feat),
+            SiLU()
+        )
+
+        self.coord_mlp = nn.Sequential(
+            nn.Linear(self.coord_feat, self.coord_feat * 4),
+            self.dropout,
+            SiLU(),
+            nn.Linear(self.coord_feat * 4, 1)
+        )
+
+        self.node_mlp = nn.Sequential(
+            nn.Linear(self.node_feat + self.coord_feat, self.node_feat * 2),
+            self.dropout,
+            SiLU(),
+            nn.Linear(self.node_feat * 2, self.node_feat),
+        )
+
+    @profile
+    def forward(self, x: Tensor, edge_index: Tensor, edge_attr: Tensor = None, size: Tensor = None) -> Tensor:
+        """Forward pass of the linear layer
+
+        Parameters
+        ----------
+        x : Tensor
+            A (num_points, d) tensor where d is pos_feat + node_feat.
+        edge_index : Tensor
+            The input edge indices tensor.
+        edge_attr : Tensor
+            A (num_edges, num_feats) tensor excluding basic distance feats.
+        """
+        x, coords = x[:, :-self.pos_feat], x[:, -self.pos_feat:]
+
+        rel_coords = coords[edge_index[0]] - coords[edge_index[1]]
+        rel_dist = (rel_coords ** 2).sum(dim=-1, keepdim=True) ** 0.5
+
+        if self.fourier_feat > 0:
+            rel_dist = fourier_encode_dist(rel_dist, num_encodings=self.fourier_feat)
+            rel_dist = rearrange(rel_dist, 'n () d -> n d')
+
+        if edge_attr is not None:
+            edge_attr = torch.cat([edge_attr, rel_dist], dim=-1)
+        else:
+            edge_attr = rel_dist
+
+        hidden_out, coors_out = self.propagate(edge_index, x=x, edge_attr=edge_attr,
+                                               coords=coords, rel_coords=rel_coords)
+        return torch.cat([hidden_out, coors_out], dim=-1)
+
+    def message(self, x_i, x_j, edge_attr) -> Tensor:
+        m_ij = self.edge_mlp(torch.cat([x_i, x_j, edge_attr], dim=-1))
+        coord_w = self.coord_mlp(m_ij)
+        return m_ij, coord_w
+
+    def propagate(self, edge_index: Tensor, size: Tensor = None, **kwargs):
+        """The initial call to start propagating messages
+
+        Parameters
+        ----------
+        edge_index : Tensor
+            A tensor that holds the indices of a general (sparse) assignment matrix of shape :obj:`[N, M]`.
+        size : Tensor
+            A (tuple, optional) tensor that, when None, will infer the size and be assumed to be quadratic.
+        **kwargs : any
+            Any additional data which is needed to construct and aggregate messages,
+            and to update node embeddings.
+        """
+        size = self.__check_input__(edge_index, size)
+        coll_dict = self.__collect__(self.__user_args__,
+                                     edge_index, size, kwargs)
+        msg_kwargs = self.inspector.distribute('message', coll_dict)
+        m_ij, coord_wij = self.message(**msg_kwargs)
+
+        # Aggregate them
+        aggr_kwargs = self.inspector.distribute('aggregate', coll_dict)
+        m_i = self.aggregate(m_ij, **aggr_kwargs)
+        coord_wi = self.aggregate(coord_wij, **aggr_kwargs)
+        coord_ri = self.aggregate(kwargs["rel_coords"], **aggr_kwargs)
+
+        # Return tuple
+        update_kwargs = self.inspector.distribute('update', coll_dict)
+
+        node, coors = kwargs["x"], kwargs["coords"]
+        coords_out = coors + (coord_wi * coord_ri)
+
+        hidden_out = self.node_mlp(torch.cat([node, m_i], dim=-1))
+        hidden_out = hidden_out + node
+
+        return self.update((hidden_out, coords_out), **update_kwargs)
+
+    def __repr__(self):
+        return f'GConvEnSparse(structure=h{self.node_feat}-p{self.pos_feat}-e{self.edge_feat}-x{self.coord_feat})'
+
+
+class GConvEnSparseNetwork(nn.Module):
+    r"""Sample GNN model architecture that uses the GConvEnSparse
+        message passing layer to learn over point clouds.
+        Main MPNN layer introduced in https://arxiv.org/abs/2102.09844v1
+        Inputs will be standard GNN: x, edge_index, edge_attr, batch, ...
+        Args:
+        * n_layers: int. number of MPNN layers
+        * ... : same interpretation as the base layer.
+        * embedding_nums: list. number of unique keys to embedd. for points
+                          1 entry per embedding needed.
+        * embedding_dims: list. point - number of dimensions of
+                          the resulting embedding. 1 entry per embedding needed.
+        * edge_embedding_nums: list. number of unique keys to embedd. for edges.
+                               1 entry per embedding needed.
+        * edge_embedding_dims: list. point - number of dimensions of
+                               the resulting embedding. 1 entry per embedding needed.
+        * recalc: bool. Whether to recalculate edge features between MPNN layers.
+        * verbose: bool. verbosity level.
+    """
+
+    def __init__(self, n_layers, node_feat, pos_feat=3,
+                 edge_feat=0, coord_feat=16,
+                 fourier_feat=0,
+                 embedding_nums=[], embedding_dims=[],
+                 edge_embedding_nums=[], edge_embedding_dims=[],
+                 recalc=True, verbose=False):
+        super().__init__()
+
+        self.n_layers = n_layers
+
+        # Embeddings? Solve here.
+        self.embedding_nums = embedding_nums
+        self.embedding_dims = embedding_dims
+        self.emb_layers = nn.ModuleList()
+        self.edge_embedding_nums = edge_embedding_nums
+        self.edge_embedding_dims = edge_embedding_dims
+        self.edge_emb_layers = nn.ModuleList()
+
+        # Instantiate point and edge embedding layers
+        for i in range(len(self.embedding_dims)):
+            self.emb_layers.append(nn.Embedding(num_embeddings=embedding_nums[i],
+                                                embedding_dim=embedding_dims[i]))
+            node_feat += embedding_dims[i] - 1
+
+        for i in range(len(self.edge_embedding_dims)):
+            self.edge_emb_layers.append(nn.Embedding(num_embeddings=edge_embedding_nums[i],
+                                                     embedding_dim=edge_embedding_dims[i]))
+            edge_feat += edge_embedding_dims[i] - 1
+        # rest
+        self.mpnn_layers = nn.ModuleList()
+        self.node_feat = node_feat
+        self.pos_feat = pos_feat
+        self.edge_feat = edge_feat
+        self.coord_feat = coord_feat
+        self.fourier_feat = fourier_feat
+        self.recalc = recalc
+        self.verbose = verbose
+
+        # instantiate layers
+        for i in range(n_layers):
+            layer = GConvEnSparse(node_feat=node_feat,
+                                  pos_feat=pos_feat,
+                                  edge_feat=edge_feat,
+                                  coord_feat=coord_feat,
+                                  fourier_feat=fourier_feat)
+            self.mpnn_layers.append(layer)
+
+    def forward(self, x, edge_index, batch, edge_attr,
+                bsize=None, recalc_edge=None, verbose=0):
+        """ Embedding of inputs when necessary, then pass layers.
+            Recalculate edge features every time with the
+            `recalc_edge` function if self.recalc_edge is set.
+        """
+        original_x = x.clone()
+        original_edge_index = edge_index.clone()
+        original_edge_attr = edge_attr.clone()
+        # pick to embedd. embedd sequentially and add to input - points:
+        to_embedd = x[:, -len(self.embedding_dims):].long()
+        for i, emb_layer in enumerate(self.emb_layers):
+            # the portion corresponding to `to_embedd` part gets dropped
+            # at first iter
+            stop_concat = -len(self.embedding_dims) if i == 0 else x.shape[-1]
+            x = torch.cat([x[:, :stop_concat],
+                           emb_layer(to_embedd[:, i])
+                           ], dim=-1)
+        # pass layers
+        for i, layer in enumerate(self.mpnn_layers):
+            # embedd edge items (needed everytime since edge_attr and idxs
+            # are recalculated every pass)
+            to_embedd = edge_attr[:, -len(self.edge_embedding_dims):].long()
+            for i, edge_emb_layer in enumerate(self.edge_emb_layers):
+                # the portion corresponding to `to_embedd` part gets dropped
+                # at first iter
+                stop_concat = -len(self.edge_embedding_dims) if i == 0 else x.shape[-1]
+                edge_attr = torch.cat([edge_attr[:, :-len(self.edge_embedding_dims) + i],
+                                       edge_emb_layer(to_embedd[:, i])
+                                       ], dim=-1)
+            # pass layers
+            x = layer(x, edge_index, edge_attr, size=bsize)
+
+            # recalculate edge info - not needed if last layer
+            if i < len(self.mpnn_layers) - 1 and self.recalc:
+                edge_attr, edge_index, _ = recalc_edge(x.detach())  # returns attr, idx, embedd_info
+            else:
+                edge_attr = original_edge_attr.clone()
+                edge_index = original_edge_index.clone()
+
+            if verbose:
+                print("========")
+                print(i, "layer, nlinks:", edge_attr.shape)
+
+        return x
+
+    def __repr__(self):
+        return 'EGNN_Sparse_Network of: {0} layers'.format(len(self.mpnn_layers))
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
+# -------------------------------------------------------------------------------------------------------------------------------------

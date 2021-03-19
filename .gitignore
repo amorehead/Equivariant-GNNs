@@ -132,3 +132,6 @@ project/wandb
 # QM9
 project/datasets/QM9/QM9_data.pt
 project/cache
+
+# SE3-Transformer
+cache
