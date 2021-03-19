@@ -2,7 +2,7 @@
 
 ####################### BSUB Headers ############################################################
 #BSUB -P bip198
-#BSUB -W 00:30
+#BSUB -W 00:10
 #BSUB -nnodes 2
 #BSUB -q batch
 #BSUB -alloc_flags "gpumps"
