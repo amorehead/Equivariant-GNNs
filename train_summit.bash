@@ -22,8 +22,7 @@ eval "$(conda shell.bash hook)"
 # Remote Conda environment
 conda activate "$PROJDIR"/venv
 
-# Configure Weights and Biases (Wandb) for local configuration storage and proxy access on compute nodes:
-export WANDB_CONFIG_DIR=.
+# Configure Neptune.ai logger for local configuration storage and proxy access on compute nodes
 export all_proxy=socks://proxy.ccs.ornl.gov:3128/
 export ftp_proxy=ftp://proxy.ccs.ornl.gov:3128/
 export http_proxy=http://proxy.ccs.ornl.gov:3128/
