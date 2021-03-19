@@ -33,6 +33,7 @@ class LitSET(pl.LightningModule):
         self.n_heads = n_heads
         self.lr = lr
         self.num_epochs = num_epochs
+        self.save_dir = save_dir
 
         # Collect dataset-specific parameters
         self.std = std

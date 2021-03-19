@@ -29,6 +29,7 @@ class LitTFN(pl.LightningModule):
         self.edge_dim = edge_dim
         self.lr = lr
         self.num_epochs = num_epochs
+        self.save_dir = save_dir
 
         # Collect dataset-specific parameters
         self.std = std

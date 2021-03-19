@@ -33,6 +33,7 @@ class LitEGNN(pl.LightningModule):
         self.num_layers = num_layers
         self.lr = lr
         self.num_epochs = num_epochs
+        self.save_dir = save_dir
 
         # Assemble the layers of the network
         self.build_gcn_model()
