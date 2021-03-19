@@ -276,7 +276,7 @@ def collect_args():
     parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
 
     parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
-    parser.add_argument('--project_name', type=str, default='DeepInteract', help="Neptune project name")
+    parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
 
     # -----------------
     # Miscellaneous
