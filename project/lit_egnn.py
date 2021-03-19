@@ -185,6 +185,7 @@ def cli_main():
         if not args.experiment_name \
         else args.experiment_name
     logger = construct_tensorboard_pl_logger(args)
+    # logger.experiment.log_artifact(args.save_dir)  # Neptune-specific
     trainer.logger = logger
 
     trainer.fit(lit_egnn, datamodule=data_module)
