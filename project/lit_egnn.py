@@ -1,5 +1,3 @@
-import os
-
 import pytorch_lightning as pl
 import torch
 from einops import rearrange
@@ -11,7 +9,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GConvEn
-from project.utils.utils import collect_args, process_args
+from project.utils.utils import collect_args, process_args, construct_neptune_pl_logger
 
 
 class LitEGNN(pl.LightningModule):
@@ -19,7 +17,7 @@ class LitEGNN(pl.LightningModule):
 
     def __init__(self, node_feat: int = 512, pos_feat: int = 3, coord_feat: int = 16, edge_feat: int = 0,
                  fourier_feat: int = 0, num_nearest_neighbors: int = 3, num_classes: int = 2, num_layers: int = 4,
-                 lr: float = 1e-3, num_epochs: int = 5):
+                 lr: float = 1e-3, num_epochs: int = 5, save_dir: str = ''):
         """Initialize all the parameters for an EGNN."""
         super().__init__()
         self.save_hyperparameters()
@@ -68,7 +66,6 @@ class LitEGNN(pl.LightningModule):
 
         # Make a forward pass through the network
         h, x = self.forward(h, x)
-        # h, x = self.forward(h, x, e)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
@@ -139,7 +136,8 @@ class LitEGNN(pl.LightningModule):
 
     def configure_callbacks(self):
         early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="min")
-        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3)
+        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3,
+                                     dirpath=self.save_dir, filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
         return [early_stop, checkpoint]
 
 
@@ -161,29 +159,21 @@ def cli_main():
     data_module.prepare_data()
     data_module.setup()
 
-    # ------------
-    # Checkpoint
-    # ------------
-    checkpoint_save_path = os.path.join(args.save_dir, f'{args.name}.pth')
-    try:
-        lit_egnn = LitEGNN.load_from_checkpoint(checkpoint_save_path)
-        print(f'Resuming from checkpoint {checkpoint_save_path}\n')
-    except:
-        # -----------
-        # Model
-        # -----------
-        print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
-        lit_egnn = LitEGNN(
-            node_feat=data_module.num_node_features,
-            pos_feat=data_module.num_pos_features,
-            coord_feat=data_module.num_coord_features,
-            edge_feat=0,
-            fourier_feat=data_module.num_fourier_features,
-            num_nearest_neighbors=args.num_nearest_neighbors,
-            num_classes=data_module.rg_train.out_dim,
-            num_layers=args.num_layers,
-            lr=args.lr,
-            num_epochs=args.num_epochs)
+    # -----------
+    # Model
+    # -----------
+    lit_egnn = LitEGNN(
+        node_feat=data_module.num_node_features,
+        pos_feat=data_module.num_pos_features,
+        coord_feat=data_module.num_coord_features,
+        edge_feat=0,
+        fourier_feat=data_module.num_fourier_features,
+        num_nearest_neighbors=args.num_nearest_neighbors,
+        num_classes=data_module.rg_train.out_dim,
+        num_layers=args.num_layers,
+        lr=args.lr,
+        num_epochs=args.num_epochs,
+        save_dir=args.save_dir)
 
     # -----------
     # Training
@@ -191,9 +181,12 @@ def cli_main():
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.min_epochs = args.num_epochs
 
-    # Logging all args to wandb
-    # logger = construct_wandb_pl_logger(args)
-    # trainer.logger = logger
+    # Logging everything to Neptune
+    args.experiment_name = f'EGNN-l{args.num_layers}-c{args.num_channels}' \
+        if not args.experiment_name \
+        else args.experiment_name
+    logger = construct_neptune_pl_logger(args)
+    trainer.logger = logger
 
     trainer.fit(lit_egnn, datamodule=data_module)
 
@@ -202,12 +195,6 @@ def cli_main():
     # -----------
     # rg_test_results = trainer.test()
     # print(f'Model testing results on dataset: {rg_test_results}\n')
-
-    # ------------
-    # Finalizing
-    # ------------
-    print(f'Saving checkpoint {checkpoint_save_path}\n')
-    trainer.save_checkpoint(checkpoint_save_path)
 
 
 if __name__ == '__main__':

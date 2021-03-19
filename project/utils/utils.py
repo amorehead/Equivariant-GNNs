@@ -5,7 +5,7 @@ import dgl
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import NeptuneLogger
 from scipy.constants import physical_constants
 
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, \
@@ -16,9 +16,6 @@ try:
     from types import SliceType
 except ImportError:
     SliceType = slice
-
-# __main__.pymol_argv = ['pymol', '-qc']  # Quiet and no GUI
-# pymol.finish_launching()
 
 hartree2eV = physical_constants['hartree-electron volt relationship'][0]
 unit_conversion = {'mu': 1.0,
@@ -149,138 +146,6 @@ def norm2units(x, std, mean, task, denormalize=True, center=True):
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------
-# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
-# -------------------------------------------------------------------------------------------------------------------------------------
-
-
-def collect_args():
-    """Collect all arguments required for training/testing."""
-    parser = ArgumentParser()
-    parser = pl.Trainer.add_argparse_args(parser)
-
-    # -----------------
-    # Model parameters
-    # -----------------
-    parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
-    parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
-    parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
-    parser.add_argument('--num_nlayers', type=int, default=0, help="Number of layers for nonlinearity")
-    parser.add_argument('--fully_connected', action='store_true', default=False, help="Include global node in graph")
-    parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
-    parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
-    parser.add_argument('--head', type=int, default=8, help="Number of attention heads")
-    parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
-
-    # -----------------
-    # Meta-parameters
-    # -----------------
-    parser.add_argument('--batch_size', type=int, default=1, help="Batch size")
-    parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
-    parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
-    parser.add_argument('--num_epochs', type=int, default=3, help="Number of epochs")
-
-    # -----------------
-    # Data parameters
-    # -----------------
-    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
-                        help='Path to preprocessed QM9 dataset')
-    parser.add_argument('--task', type=str, default='homo',
-                        help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
-
-    # -----------------
-    # Logging
-    # -----------------
-    parser.add_argument('--model', type=str, default='LitRGSET', help="Model being used")
-    parser.add_argument('--name', type=str, default=None, help="Run name")
-    parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
-    parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
-    parser.add_argument('--save_dir', type=str, default="models", help="Directory name to save models")
-    parser.add_argument('--wandb', type=str, default='equivariant-gnns', help="WandB project name")
-    parser.add_argument('--entity', type=str, default='bml-lab', help="WandB project name")
-
-    # -----------------
-    # Miscellaneous
-    # -----------------
-    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
-    parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
-
-    # -----------------
-    # Seed parameter
-    # -----------------
-    parser.add_argument('--seed', type=int, default=None, help='Seed for NumPy and PyTorch')
-
-    args, unparsed_argv = parser.parse_known_args()
-    return args, unparsed_argv
-
-
-def process_args(args, unparsed_argv):
-    """Process all arguments required for training/testing."""
-    # ---------------------------------------
-    # Name fixing
-    # ---------------------------------------
-    if not args.name:
-        # args.name = f'RGTFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        # args.name = f'RGSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        # args.name = f'TetrisSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        # args.name = f'MCSET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}'
-        args.name = f'EGNN-l{args.num_layers}-c{args.num_channels}'
-
-    # ---------------------------------------
-    # Model directory creation
-    # ---------------------------------------
-    if not os.path.exists(args.save_dir):
-        os.mkdir(args.save_dir)
-
-    # ---------------------------------------
-    # Seed fixing for random numbers
-    # ---------------------------------------
-    if not args.seed:
-        args.seed = 42  # np.random.randint(100000)
-    pl.seed_everything(args.seed)
-
-    print("\n\nargs:", args)
-    print("unparsed_argv:", unparsed_argv, "\n\n")
-
-
-def construct_wandb_pl_logger(args):
-    """Return an instance of WandbLogger with corresponding project and name strings."""
-    return WandbLogger(name=args.name, project=args.wandb, entity=args.entity) \
-        if args.name else WandbLogger(project=f'{args.wandb}', entity=args.entity)
-
-
-def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
-    # src, dst : indices for vertices of source and destination, np.array
-    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
-    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
-    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
-    if num_nodes:
-        G = dgl.graph((src, dst), num_nodes=num_nodes)
-    else:
-        G = dgl.graph((src, dst))
-    if undirected:
-        G = dgl.to_bidirected(G)
-    # Add node features to graph
-    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
-    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
-    # Add edge features to graph
-    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
-    return G
-
-
-def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
-    # pos :n by 3 np.array for xyz
-    x = np.array(range(pos.shape[0]))
-    src = np.repeat(x, x.shape[0])
-    dst = np.tile(x, x.shape[0])
-    flag = src != dst
-    G = dgl.graph((src[flag], dst[flag]))
-    G.ndata['x'] = pos
-    G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
-    G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
-    return G
-
-
-# -------------------------------------------------------------------------------------------------------------------------------------
 # Following code derived from egnn-pytorch (https://github.com/lucidrains/egnn-pytorch/blob/main/egnn_pytorch/utils.py):
 # -------------------------------------------------------------------------------------------------------------------------------------
 
@@ -329,3 +194,123 @@ def batched_index_select(values, indices, dim=1):
 
     dim += value_expand_len
     return values.gather(dim, indices)
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------
+# Following code curated for Equivariant-GNNs (https://github.com/amorehead/Equivariant-GNNs):
+# -------------------------------------------------------------------------------------------------------------------------------------
+
+
+def get_graph(src, dst, pos, node_feature, edge_feature, dtype, undirected=True, num_nodes=None):
+    # src, dst : indices for vertices of source and destination, np.array
+    # pos: x,y,z coordinates of all vertices with respect to the indices, np.array
+    # node_feature: node feature of shape [num_atoms,node_feature_size,1], np.array
+    # edge_feature: edge feature of shape [num_atoms,edge_feature_size], np.array
+    if num_nodes:
+        G = dgl.graph((src, dst), num_nodes=num_nodes)
+    else:
+        G = dgl.graph((src, dst))
+    if undirected:
+        G = dgl.to_bidirected(G)
+    # Add node features to graph
+    G.ndata['x'] = torch.tensor(pos.astype(dtype))  # [num_atoms,3]
+    G.ndata['f'] = torch.tensor(node_feature.astype(dtype))
+    # Add edge features to graph
+    G.edata['w'] = torch.tensor(edge_feature.astype(dtype))  # [num_atoms,edge_feature_size]
+    return G
+
+
+def get_fully_connected_graph(pos, fill=0, dtype=np.float32):
+    # pos :n by 3 np.array for xyz
+    x = np.array(range(pos.shape[0]))
+    src = np.repeat(x, x.shape[0])
+    dst = np.tile(x, x.shape[0])
+    flag = src != dst
+    G = dgl.graph((src[flag], dst[flag]))
+    G.ndata['x'] = pos
+    G.ndata['f'] = torch.tensor(np.full((G.num_nodes(), 1, 1), fill).astype(dtype))
+    G.edata['w'] = torch.tensor(np.full((G.num_edges(), 1), fill).astype(dtype))
+    return G
+
+
+def collect_args():
+    """Collect all arguments required for training/testing."""
+    parser = ArgumentParser()
+    parser = pl.Trainer.add_argparse_args(parser)
+
+    # -----------------
+    # Model parameters
+    # -----------------
+    parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
+    parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
+    parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
+    parser.add_argument('--num_nlayers', type=int, default=0, help="Number of layers for nonlinearity")
+    parser.add_argument('--fully_connected', action='store_true', default=False, help="Include global node in graph")
+    parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
+    parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
+    parser.add_argument('--head', type=int, default=8, help="Number of attention heads")
+    parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
+
+    # -----------------
+    # Meta-parameters
+    # -----------------
+    parser.add_argument('--batch_size', type=int, default=1, help="Batch size")
+    parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
+    parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
+    parser.add_argument('--num_epochs', type=int, default=3, help="Number of epochs")
+    parser.add_argument('--save_dir', type=str, default="models", help="Directory in which to save models")
+
+    # -----------------
+    # Data parameters
+    # -----------------
+    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
+                        help='Path to preprocessed QM9 dataset')
+    parser.add_argument('--task', type=str, default='homo',
+                        help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
+
+    # -----------------
+    # Logging
+    # -----------------
+    parser.add_argument('--model', type=str, default='LitRGSET', help="Model being used")
+    parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
+    parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
+
+    parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
+    parser.add_argument('--project_name', type=str, default='DeepInteract', help="Neptune project name")
+
+    # -----------------
+    # Miscellaneous
+    # -----------------
+    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
+    parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
+
+    # -----------------
+    # Seed parameter
+    # -----------------
+    parser.add_argument('--seed', type=int, default=None, help='Seed for NumPy and PyTorch')
+
+    args, unparsed_argv = parser.parse_known_args()
+    return args, unparsed_argv
+
+
+def process_args(args, unparsed_argv):
+    """Process all arguments required for training/testing."""
+    # ---------------------------------------
+    # Model directory creation
+    # ---------------------------------------
+    if not os.path.exists(args.save_dir):
+        os.mkdir(args.save_dir)
+
+    # ---------------------------------------
+    # Seed fixing for random numbers
+    # ---------------------------------------
+    if not args.seed:
+        args.seed = 42  # np.random.randint(100000)
+    pl.seed_everything(args.seed)
+
+
+def construct_neptune_pl_logger(args):
+    """Return an instance of NeptuneLogger with corresponding project and experiment name strings."""
+    return NeptuneLogger(experiment_name=args.experiment_name, project_name=args.project_name) \
+        if args.experiment_name \
+        else NeptuneLogger(project_name=f'{args.project_name}')

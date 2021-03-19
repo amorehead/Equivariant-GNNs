@@ -5,15 +5,12 @@ channels:
   - dglteam
   - pytorch
 dependencies:
-#  - If not running on Summit, install the following commented-out packages for Python 3.8 and CUDA 11.0 support locally:
-#  - python=3.8
-#  - cudatoolkit=11.0  # Install after creating initial environment with 'conda install pytorch cudatoolkit=11.0 -c pytorch'
-#  - pytorch=1.7.1  # Install after creating initial environment with 'conda install pytorch cudatoolkit=11.0 -c pytorch'
-#  - dgl-cuda11.0
   - anaconda
-  - pip
   - python=3.6
-  - pytorch
+  - pip
+#  - After creating initial Conda environment, uncomment and run the following if not already installed on your machine
+#  - pytorch  # Install with 'conda install pytorch -c pytorch -c conda-forge' - already installed on Summit
+#  - dgl-cudaXX.X  # Replace XX.X with the version of cudatoolkit installed by 'conda install pytorch -c pytorch -c conda-forge' directly above - must be manually compiled and installed on Summit
   - pip:
       - -e .
       - -r file:requirements.txt

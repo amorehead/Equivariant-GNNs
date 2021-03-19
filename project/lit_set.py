@@ -1,5 +1,3 @@
-import os
-
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torch.nn import Linear, ReLU, ModuleList
@@ -10,7 +8,7 @@ from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r
+from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_neptune_pl_logger
 
 
 class LitSET(pl.LightningModule):
@@ -18,7 +16,8 @@ class LitSET(pl.LightningModule):
 
     def __init__(self, num_layers: int, atom_feature_size: int, num_channels: int, num_nlayers: int = 1,
                  num_degrees: int = 4, edge_dim: int = 4, div: float = 4, pooling: str = 'avg', n_heads: int = 1,
-                 lr: float = 1e-3, num_epochs: int = 5, std: float = 1.0, mean: float = 0.0, task: str = 'homo'):
+                 lr: float = 1e-3, num_epochs: int = 5, std: float = 1.0, mean: float = 0.0, task: str = 'homo',
+                 save_dir: str = ''):
         """Initialize all the parameters for a SET."""
         super().__init__()
         self.save_hyperparameters()
@@ -166,7 +165,8 @@ class LitSET(pl.LightningModule):
 
     def configure_callbacks(self):
         early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="min")
-        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3)
+        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3,
+                                     dirpath=self.save_dir, filename='LitSET-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
         return [early_stop, checkpoint]
 
 
@@ -188,29 +188,21 @@ def cli_main():
     data_module.prepare_data()
     data_module.setup()
 
-    # ------------
-    # Checkpoint
-    # ------------
-    checkpoint_save_path = os.path.join(args.save_dir, f'{args.name}.pth')
-    try:
-        lit_set = LitSET.load_from_checkpoint(checkpoint_save_path)
-        print(f'Resuming from checkpoint {checkpoint_save_path}\n')
-    except:
-        # -----------
-        # Model
-        # -----------
-        print(f'Could not restore checkpoint {checkpoint_save_path}. Skipping...\n')
-        lit_set = LitSET(num_layers=args.num_layers,
-                         atom_feature_size=data_module.num_node_features,
-                         num_channels=args.num_channels,
-                         num_nlayers=args.num_nlayers,
-                         num_degrees=args.num_degrees,
-                         edge_dim=data_module.num_edge_features,
-                         div=args.div,
-                         pooling=args.pooling,
-                         n_heads=args.head,
-                         lr=args.lr,
-                         num_epochs=args.num_epochs)
+    # -----------
+    # Model
+    # -----------
+    lit_set = LitSET(num_layers=args.num_layers,
+                     atom_feature_size=data_module.num_node_features,
+                     num_channels=args.num_channels,
+                     num_nlayers=args.num_nlayers,
+                     num_degrees=args.num_degrees,
+                     edge_dim=data_module.num_edge_features,
+                     div=args.div,
+                     pooling=args.pooling,
+                     n_heads=args.head,
+                     lr=args.lr,
+                     num_epochs=args.num_epochs,
+                     save_dir=args.save_dir)
 
     # -----------
     # Training
@@ -218,9 +210,12 @@ def cli_main():
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.min_epochs = args.num_epochs
 
-    # Logging all args to wandb
-    # logger = construct_wandb_pl_logger(args)
-    # trainer.logger = logger
+    # Logging everything to Neptune
+    args.experiment_name = f'SET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}' \
+        if not args.experiment_name \
+        else args.experiment_name
+    logger = construct_neptune_pl_logger(args)
+    trainer.logger = logger
 
     trainer.fit(lit_set, datamodule=data_module)
 
@@ -229,12 +224,6 @@ def cli_main():
     # -----------
     rg_test_results = trainer.test()
     print(f'Model testing results on dataset: {rg_test_results}\n')
-
-    # ------------
-    # Finalizing
-    # ------------
-    print(f'Saving checkpoint {checkpoint_save_path}\n')
-    trainer.save_checkpoint(checkpoint_save_path)
 
 
 if __name__ == '__main__':
