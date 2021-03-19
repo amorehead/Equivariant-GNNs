@@ -3,7 +3,7 @@
 ####################### BSUB Headers ############################################################
 #BSUB -P bip198
 #BSUB -W 00:30
-#BSUB -nnodes 1
+#BSUB -nnodes 2
 #BSUB -q batch
 #BSUB -alloc_flags "gpumps"
 #BSUB -J train_lit_egnn_model_with_pl
@@ -31,4 +31,4 @@ export no_proxy='localhost,127.0.0.0/8,.ccs.ornl.gov,.ncrc.gov'
 
 # Run training script
 cd "$PROJDIR"/project || exit
-jsrun -r1 -g1 -a1 -c6 --smpiargs="off" python lit_egnn.py
+jsrun -r1 -g6 -a6 -c21 -bpacked:7 python lit_egnn.py
