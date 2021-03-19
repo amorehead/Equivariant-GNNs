@@ -8,7 +8,7 @@ from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_neptune_pl_logger
+from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_tensorboard_pl_logger
 
 
 class LitTFN(pl.LightningModule):
@@ -214,7 +214,7 @@ def cli_main():
     args.experiment_name = f'TFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}' \
         if not args.experiment_name \
         else args.experiment_name
-    logger = construct_neptune_pl_logger(args)
+    logger = construct_tensorboard_pl_logger(args)
     trainer.logger = logger
 
     trainer.fit(lit_tfn, datamodule=data_module)

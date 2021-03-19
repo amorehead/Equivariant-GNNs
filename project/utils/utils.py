@@ -5,7 +5,7 @@ import dgl
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.loggers import NeptuneLogger
+from pytorch_lightning.loggers import NeptuneLogger, TensorBoardLogger
 from scipy.constants import physical_constants
 
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, \
@@ -318,3 +318,8 @@ def construct_neptune_pl_logger(args):
                          params={'max_epochs': args.num_epochs, 'batch_size': args.batch_size, 'lr': args.lr},
                          tags=['pytorch-lightning', 'graph-neural-network', 'equivariance'],
                          upload_source_files=['*.py'])
+
+
+def construct_tensorboard_pl_logger(args):
+    """Return an instance of TensorBoardLogger with corresponding project and experiment name strings."""
+    return TensorBoardLogger('tb_log', name=args.experiment_name)

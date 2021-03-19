@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import EnGraphConv
-from project.utils.utils import collect_args, process_args, construct_neptune_pl_logger
+from project.utils.utils import collect_args, process_args, construct_tensorboard_pl_logger
 
 
 class LitEGNN(pl.LightningModule):
@@ -184,7 +184,7 @@ def cli_main():
     args.experiment_name = f'EGNN-l{args.num_layers}-c{args.num_channels}' \
         if not args.experiment_name \
         else args.experiment_name
-    logger = construct_neptune_pl_logger(args)
+    logger = construct_tensorboard_pl_logger(args)
     trainer.logger = logger
 
     trainer.fit(lit_egnn, datamodule=data_module)
