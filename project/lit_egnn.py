@@ -61,6 +61,9 @@ class LitEGNN(pl.LightningModule):
 
     def training_step(self, graph_and_labels, batch_idx):
         """Lightning calls this inside the training loop."""
+
+        print(f'\n\ngraph_and_labels: {graph_and_labels}\n\n')
+
         h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
         x = torch.randn(1, h.shape[1], 3).to(self.device)
         y = graph_and_labels[1]
@@ -81,6 +84,9 @@ class LitEGNN(pl.LightningModule):
 
     def validation_step(self, graph_and_labels, batch_idx):
         """Lightning calls this inside the validation loop."""
+
+        print(f'\n\ngraph_and_labels: {graph_and_labels}\n\n')
+
         h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
         x = torch.randn(1, h.shape[1], 3).to(self.device)
         y = graph_and_labels[1]

@@ -121,6 +121,7 @@ def shape_is(a, b, ignore_batch=1):
     return np.array_equal(shape_a, shape_b)
 
 
+# TODO: Investigate collation of graphs for correct loss calculation
 def collate(samples):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
