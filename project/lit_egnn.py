@@ -149,7 +149,7 @@ def cli_main():
     process_args(args, unparsed_argv)
 
     # Define HPC-specific properties in-file
-    # args.accelerator, args.distributed_backend = 'ddp', 'ddp'
+    args.accelerator = 'ddp'
     args.gpus, args.num_nodes = 1, 1
 
     # -----------
