@@ -165,8 +165,8 @@ class LitSET(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor="val_rescaled_l1_loss", mode="min")
-        checkpoint = ModelCheckpoint(monitor="val_rescaled_l1_loss", save_top_k=3,
+        early_stop = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min')
+        checkpoint = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3,
                                      dirpath=self.save_dir, filename='LitSET-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
         return [early_stop, checkpoint]
 
