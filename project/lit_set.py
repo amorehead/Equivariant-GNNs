@@ -16,8 +16,7 @@ class LitSET(pl.LightningModule):
 
     def __init__(self, num_layers: int, atom_feature_size: int, num_channels: int, num_nlayers: int = 1,
                  num_degrees: int = 4, edge_dim: int = 4, div: float = 4, pooling: str = 'avg', n_heads: int = 1,
-                 lr: float = 1e-3, num_epochs: int = 5, std: float = 1.0, mean: float = 0.0, task: str = 'homo',
-                 save_dir: str = ''):
+                 lr: float = 1e-3, num_epochs: int = 5, std: float = 1.0, mean: float = 0.0, task: str = 'homo'):
         """Initialize all the parameters for a SET."""
         super().__init__()
         self.save_hyperparameters()
@@ -33,7 +32,6 @@ class LitSET(pl.LightningModule):
         self.n_heads = n_heads
         self.lr = lr
         self.num_epochs = num_epochs
-        self.save_dir = save_dir
 
         # Collect dataset-specific parameters
         self.std = std
@@ -164,12 +162,6 @@ class LitSET(pl.LightningModule):
             'monitor': metric_to_track
         }
 
-    def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min')
-        checkpoint = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3,
-                                     dirpath=self.save_dir, filename='LitSET-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
-        return [early_stop, checkpoint]
-
 
 def cli_main():
     # -----------
@@ -177,10 +169,6 @@ def cli_main():
     # -----------
     args, unparsed_argv = collect_args()
     process_args(args, unparsed_argv)
-
-    # Define HPC-specific properties in-file
-    args.accelerator = 'ddp'
-    args.gpus, args.num_nodes = -1, 2
 
     # -----------
     # Data
@@ -202,8 +190,7 @@ def cli_main():
                      pooling=args.pooling,
                      n_heads=args.head,
                      lr=args.lr,
-                     num_epochs=args.num_epochs,
-                     save_dir=args.save_dir)
+                     num_epochs=args.num_epochs)
 
     # -----------
     # Training
@@ -211,12 +198,21 @@ def cli_main():
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.min_epochs = args.num_epochs
 
-    # Logging everything to Neptune
+    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
+    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.save_dir,
+                                          filename='LitSET-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
+    trainer.callbacks = [early_stop_callback, checkpoint_callback]
+
     args.experiment_name = f'SET-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}' \
         if not args.experiment_name \
         else args.experiment_name
-    logger = construct_tensorboard_pl_logger(args)
+
+    # Logging everything to Neptune
+    # logger = construct_neptune_pl_logger(args)
     # logger.experiment.log_artifact(args.save_dir)  # Neptune-specific
+
+    # Logging everything to TensorBoard instead of Neptune
+    logger = construct_tensorboard_pl_logger(args)
     trainer.logger = logger
 
     trainer.fit(lit_set, datamodule=data_module)

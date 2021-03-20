@@ -255,6 +255,8 @@ def collect_args():
     # -----------------
     # Meta-parameters
     # -----------------
+    parser.add_argument('--accelerator', type=str, default='ddp', help="Backend to use for multi-GPU training")
+    parser.add_argument('--gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
     parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
@@ -312,7 +314,7 @@ def process_args(args, unparsed_argv):
 
 def construct_neptune_pl_logger(args):
     """Return an instance of NeptuneLogger with corresponding project and experiment name strings."""
-    return NeptuneLogger(experiment_name=args.experiment_name if args.experiment_name else None,
+    return NeptuneLogger(experiment_name=args.experiment_name,
                          project_name=args.project_name,
                          close_after_fit=False,
                          params={'max_epochs': args.num_epochs, 'batch_size': args.batch_size, 'lr': args.lr},

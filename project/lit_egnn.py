@@ -17,7 +17,7 @@ class LitEGNN(pl.LightningModule):
 
     def __init__(self, node_feat: int = 512, pos_feat: int = 3, coord_feat: int = 16, edge_feat: int = 0,
                  fourier_feat: int = 0, num_nearest_neighbors: int = 3, num_classes: int = 2, num_layers: int = 4,
-                 lr: float = 1e-3, num_epochs: int = 5, save_dir: str = ''):
+                 lr: float = 1e-3, num_epochs: int = 5):
         """Initialize all the parameters for an EGNN."""
         super().__init__()
         self.save_hyperparameters()
@@ -33,7 +33,6 @@ class LitEGNN(pl.LightningModule):
         self.num_layers = num_layers
         self.lr = lr
         self.num_epochs = num_epochs
-        self.save_dir = save_dir
 
         # Assemble the layers of the network
         self.build_gcn_model()
@@ -133,12 +132,6 @@ class LitEGNN(pl.LightningModule):
             'monitor': metric_to_track
         }
 
-    def configure_callbacks(self):
-        early_stop = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min')
-        checkpoint = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3,
-                                     dirpath=self.save_dir, filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
-        return [early_stop, checkpoint]
-
 
 def cli_main():
     # -----------
@@ -146,10 +139,6 @@ def cli_main():
     # -----------
     args, unparsed_argv = collect_args()
     process_args(args, unparsed_argv)
-
-    # Define HPC-specific properties in-file
-    args.accelerator = 'ddp'
-    args.gpus, args.num_nodes = -1, 2
 
     # -----------
     # Data
@@ -171,8 +160,7 @@ def cli_main():
         num_classes=data_module.rg_train.out_dim,
         num_layers=args.num_layers,
         lr=args.lr,
-        num_epochs=args.num_epochs,
-        save_dir=args.save_dir)
+        num_epochs=args.num_epochs)
 
     # -----------
     # Training
@@ -180,12 +168,21 @@ def cli_main():
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.min_epochs = args.num_epochs
 
-    # Logging everything to Neptune
+    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
+    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.save_dir,
+                                          filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
+    trainer.callbacks = [early_stop_callback, checkpoint_callback]
+
     args.experiment_name = f'EGNN-l{args.num_layers}-c{args.num_channels}' \
         if not args.experiment_name \
         else args.experiment_name
-    logger = construct_tensorboard_pl_logger(args)
+
+    # Logging everything to Neptune
+    # logger = construct_neptune_pl_logger(args)
     # logger.experiment.log_artifact(args.save_dir)  # Neptune-specific
+
+    # Logging everything to TensorBoard instead of Neptune
+    logger = construct_tensorboard_pl_logger(args)
     trainer.logger = logger
 
     trainer.fit(lit_egnn, datamodule=data_module)
