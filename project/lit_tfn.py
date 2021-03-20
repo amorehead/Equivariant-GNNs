@@ -167,8 +167,8 @@ def cli_main():
     # -----------
     # Arguments
     # -----------
-    args, unparsed_argv = collect_args()
-    process_args(args, unparsed_argv)
+    args = collect_args()
+    process_args(args)
 
     # -----------
     # Data

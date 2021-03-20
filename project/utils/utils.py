@@ -255,8 +255,8 @@ def collect_args():
     # -----------------
     # Meta-parameters
     # -----------------
-    parser.add_argument('--accelerator', type=str, default='ddp', help="Backend to use for multi-GPU training")
-    parser.add_argument('--gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
+    parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
+    parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
     parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
@@ -292,11 +292,17 @@ def collect_args():
     # -----------------
     parser.add_argument('--seed', type=int, default=None, help='Seed for NumPy and PyTorch')
 
+    # Parse all known arguments
     args, unparsed_argv = parser.parse_known_args()
-    return args, unparsed_argv
+
+    # Set HPC-specific parameter values
+    args.accelerator = args.multi_gpu_backend
+    args.gpus = args.num_gpus
+
+    return args
 
 
-def process_args(args, unparsed_argv):
+def process_args(args):
     """Process all arguments required for training/testing."""
     # ---------------------------------------
     # Model directory creation
