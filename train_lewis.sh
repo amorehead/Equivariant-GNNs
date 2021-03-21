@@ -2,7 +2,7 @@
 
 ####################### Batch Headers #########################
 #SBATCH -p Lewis
-#SBATCH -J train_lit_egnn_model_with_pl
+#SBATCH -J train_lit_set_model_with_pl
 #SBATCH -t 0-02:00
 #SBATCH --partition Gpu
 #SBATCH --gres gpu:1
@@ -27,4 +27,4 @@ module load cuda/cuda-10.1.243
 
 # Run training script
 cd "$PROJDIR"/project || exit
-python3 lit_egnn.py
+python3 lit_set.py
