@@ -261,7 +261,8 @@ def collect_args():
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=5, help="Number of epochs")
-    parser.add_argument('--save_dir', type=str, default="models", help="Directory in which to save models")
+    parser.add_argument('--ckpt_dir', type=str, default="checkpoints", help="Directory in which to save checkpoints")
+    parser.add_argument('--ckpt_name', type=str, default=None, help="Filename of best checkpoint")
 
     # -----------------
     # Data parameters
@@ -274,10 +275,6 @@ def collect_args():
     # -----------------
     # Logging
     # -----------------
-    parser.add_argument('--model', type=str, default='LitSET', help="Model being used")
-    parser.add_argument('--log_interval', type=int, default=25, help="Number of steps between logging key stats")
-    parser.add_argument('--print_interval', type=int, default=250, help="Number of steps between printing key stats")
-
     parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
     parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
 
@@ -307,8 +304,8 @@ def process_args(args):
     # ---------------------------------------
     # Model directory creation
     # ---------------------------------------
-    if not os.path.exists(args.save_dir):
-        os.mkdir(args.save_dir)
+    if not os.path.exists(args.ckpt_dir):
+        os.mkdir(args.ckpt_dir)
 
     # ---------------------------------------
     # Seed fixing for random numbers

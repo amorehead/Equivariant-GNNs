@@ -119,11 +119,6 @@ venv.bak/
 .idea
 .vscode
 
-# seed project
-lightning_logs/
-MNIST
-.DS_Store
-
 # Neptune
 project/models/**
 project/DeepInteract
@@ -134,3 +129,9 @@ project/cache
 
 # SE3-Transformer
 cache
+
+# PyTorch Lightning
+lightning_logs/
+checkpoints
+tb_log
+.DS_Store

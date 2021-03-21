@@ -1,7 +1,9 @@
+import os
+
 import pytorch_lightning as pl
 import torch
 from einops import rearrange
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from torch.nn import ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
@@ -168,23 +170,34 @@ def cli_main():
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.min_epochs = args.num_epochs
 
-    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
-    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.save_dir,
-                                          filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
-    trainer.callbacks = [early_stop_callback, checkpoint_callback]
+    # Resume from checkpoint if path to a valid one is provided
+    args.ckpt_name = args.ckpt_name \
+        if args.ckpt_name is not None \
+        else 'LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}.ckpt'
+    checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
+    trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
 
+    # Create and use callbacks
+    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
+    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.ckpt_dir,
+                                          filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
+    lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
+    trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
+
+    # Initialize logger
     args.experiment_name = f'EGNN-l{args.num_layers}-c{args.num_channels}' \
         if not args.experiment_name \
         else args.experiment_name
 
     # Logging everything to Neptune
     # logger = construct_neptune_pl_logger(args)
-    # logger.experiment.log_artifact(args.save_dir)  # Neptune-specific
+    # logger.experiment.log_artifact(args.ckpt_dir)  # Neptune-specific
 
     # Logging everything to TensorBoard instead of Neptune
     logger = construct_tensorboard_pl_logger(args)
     trainer.logger = logger
 
+    # Train with the provided model and data module
     trainer.fit(lit_egnn, datamodule=data_module)
 
     # -----------
@@ -192,6 +205,8 @@ def cli_main():
     # -----------
     test_results = trainer.test()
     print(f'Model testing results on dataset: {test_results}\n')
+
+    # logger.experiment.stop()  # Halt the current Neptune experiment
 
 
 if __name__ == '__main__':
