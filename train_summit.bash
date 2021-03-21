@@ -1,12 +1,12 @@
 #!/bin/bash
 
 ####################### BSUB Headers ############################################################
+#BSUB -J train_lit_set_model_with_pl
 #BSUB -P bip198
 #BSUB -W 00:10
 #BSUB -nnodes 2
-#BSUB -q batch
+#BSUB -q batch-hm
 #BSUB -alloc_flags "gpumps"
-#BSUB -J train_lit_set_model_with_pl
 #BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB --signal=SIGUSR1@90
