@@ -239,9 +239,9 @@ def collect_args():
     parser = ArgumentParser()
     parser = pl.Trainer.add_argparse_args(parser)
 
-    # -----------------
+    # -------------------
     # Model parameters
-    # -----------------
+    # -------------------
     parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
     parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
     parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
@@ -252,30 +252,24 @@ def collect_args():
     parser.add_argument('--head', type=int, default=1, help="Number of attention heads")
     parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
 
-    # -----------------
+    # -------------------
     # Meta-parameters
-    # -----------------
-    parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
-    parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
-    parser.add_argument('--profiler_method', type=str, default='simple', help="PyTorch Lightning profiler to use")
+    # -------------------
     parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
     parser.add_argument('--num_epochs', type=int, default=5, help="Number of epochs")
-    parser.add_argument('--ckpt_dir', type=str, default="checkpoints", help="Directory in which to save checkpoints")
-    parser.add_argument('--ckpt_name', type=str, default=None, help="Filename of best checkpoint")
 
     # -----------------
     # Data parameters
     # -----------------
-    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt',
-                        help='Path to preprocessed QM9 dataset')
+    parser.add_argument('--data_dir', type=str, default='datasets/QM9/QM9_data.pt', help='Path to processed QM9')
     parser.add_argument('--task', type=str, default='homo',
                         help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
 
-    # -----------------
-    # Logging
-    # -----------------
+    # -------------------
+    # Logging parameters
+    # -------------------
     parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
     parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
 
@@ -284,10 +278,15 @@ def collect_args():
     # -----------------
     parser.add_argument('--seed', type=int, default=None, help='Seed for NumPy and PyTorch')
 
-    # -----------------
+    # -------------------
     # Miscellaneous
-    # -----------------
+    # -------------------
+    parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
+    parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
     parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
+    parser.add_argument('--profiler_method', type=str, default='simple', help="PyTorch Lightning profiler to use")
+    parser.add_argument('--ckpt_dir', type=str, default="checkpoints", help="Directory in which to save checkpoints")
+    parser.add_argument('--ckpt_name', type=str, default=None, help="Filename of best checkpoint")
 
     # Parse all known arguments
     args, unparsed_argv = parser.parse_known_args()
