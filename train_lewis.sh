@@ -27,11 +27,20 @@ module load cuda/cuda-10.1.243
 
 # Run training script
 cd "$PROJDIR"/project || exit
-START=$(date +%s)  # Capture script start time in seconds since Unix epoch
-python3 lit_set.py
-END=$(date +%s)  # Capture script end time in seconds since Unix epoch
 
-# Calculate and output number of hours elapsed during script execution
+START=$(date +%s)  # Capture script start time in seconds since Unix epoch
+echo "Script started at $(date)"
+
+python3 lit_set.py  # Execute script
+
+END=$(date +%s)  # Capture script end time in seconds since Unix epoch
+echo "Script finished at $(date)"
+
+# Calculate and output time elapsed during script execution
 ((diff=END-START))
-((minutes=diff/(60)))
+((seconds=diff))
+((minutes=seconds/(60)))
+((hours=minutes/(24)))
+echo "Script took $seconds seconds to execute"
 echo "Script took $minutes minutes to execute"
+echo "Script took $hours hours to execute"
