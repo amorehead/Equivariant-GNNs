@@ -257,6 +257,7 @@ def collect_args():
     # -----------------
     parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
     parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
+    parser.add_argument('--profiler_method', type=str, default='simple', help="PyTorch Lightning profiler to use")
     parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
@@ -279,15 +280,14 @@ def collect_args():
     parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
 
     # -----------------
-    # Miscellaneous
-    # -----------------
-    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
-    parser.add_argument('--profile', action='store_true', default=False, help="Exit after 10 steps for profiling")
-
-    # -----------------
     # Seed parameter
     # -----------------
     parser.add_argument('--seed', type=int, default=None, help='Seed for NumPy and PyTorch')
+
+    # -----------------
+    # Miscellaneous
+    # -----------------
+    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
 
     # Parse all known arguments
     args, unparsed_argv = parser.parse_known_args()
@@ -295,6 +295,7 @@ def collect_args():
     # Set HPC-specific parameter values
     args.accelerator = args.multi_gpu_backend
     args.gpus = args.num_gpus
+    args.profiler = args.profiler_method
 
     return args
 
