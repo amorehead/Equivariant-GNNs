@@ -198,7 +198,7 @@ def cli_main():
     # Training
     # -----------
     trainer = pl.Trainer.from_argparse_args(args)
-    trainer.min_epochs = args.num_epochs
+    trainer.max_epochs = args.num_epochs
 
     # Resume from checkpoint if path to a valid one is provided
     args.ckpt_name = args.ckpt_name \

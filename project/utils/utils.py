@@ -255,10 +255,9 @@ def collect_args():
     # -------------------
     # Meta-parameters
     # -------------------
-    parser.add_argument('--batch_size', type=int, default=4, help="Batch size")
-    parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
-    parser.add_argument('--dropout', type=float, default=0.5, help="Dropout (forget) rate")
-    parser.add_argument('--num_epochs', type=int, default=5, help="Number of epochs")
+    parser.add_argument('--batch_size', type=int, default=4, help='Number of samples included in each data batch')
+    parser.add_argument('--lr', type=float, default=1e-4, help="Learning rate")
+    parser.add_argument('--num_epochs', type=int, default=5, help="Maxiumum number of epochs to run for training")
 
     # -----------------
     # Data parameters
@@ -283,7 +282,7 @@ def collect_args():
     # -------------------
     parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
     parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
-    parser.add_argument('--num_workers', type=int, default=1, help="Number of data loader workers")
+    parser.add_argument('--num_workers', type=int, default=6, help='Number of CPU threads for loading data')
     parser.add_argument('--profiler_method', type=str, default='simple', help="PyTorch Lightning profiler to use")
     parser.add_argument('--ckpt_dir', type=str, default="checkpoints", help="Directory in which to save checkpoints")
     parser.add_argument('--ckpt_name', type=str, default=None, help="Filename of best checkpoint")
