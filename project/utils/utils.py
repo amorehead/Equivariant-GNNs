@@ -271,6 +271,9 @@ def collect_args():
     # -------------------
     parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
     parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
+    parser.add_argument('--offline', type=bool, default=True, help="Whether to log locally or remotely")
+    parser.add_argument('--close_after_fit', type=bool, default=False, help="Whether to stop logger after calling fit")
+    parser.add_argument('--tb_log_dir', type=str, default='tb_log', help="Where to store TensorBoard log files")
 
     # -----------------
     # Seed parameter
@@ -318,12 +321,13 @@ def construct_neptune_pl_logger(args):
     """Return an instance of NeptuneLogger with corresponding project and experiment name strings."""
     return NeptuneLogger(experiment_name=args.experiment_name,
                          project_name=args.project_name,
-                         close_after_fit=False,
+                         close_after_fit=args.close_after_fit,
                          params={'max_epochs': args.num_epochs, 'batch_size': args.batch_size, 'lr': args.lr},
                          tags=['pytorch-lightning', 'graph-neural-network', 'equivariance'],
-                         upload_source_files=['*.py'])
+                         upload_source_files=['*.py'],
+                         offline_mode=args.offline)
 
 
 def construct_tensorboard_pl_logger(args):
     """Return an instance of TensorBoardLogger with corresponding project and experiment name strings."""
-    return TensorBoardLogger('tb_log', name=args.experiment_name)
+    return TensorBoardLogger(save_dir=args.tb_log_dir, name=args.experiment_name)

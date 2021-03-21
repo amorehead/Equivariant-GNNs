@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import EnGraphConv
-from project.utils.utils import collect_args, process_args, construct_tensorboard_pl_logger
+from project.utils.utils import collect_args, process_args, construct_tensorboard_pl_logger, construct_neptune_pl_logger
 
 
 class LitEGNN(pl.LightningModule):
@@ -156,7 +156,7 @@ def cli_main():
         node_feat=data_module.num_node_features,
         pos_feat=data_module.num_pos_features,
         coord_feat=data_module.num_coord_features,
-        edge_feat=0,
+        edge_feat=0,  # Placeholder
         fourier_feat=data_module.num_fourier_features,
         num_nearest_neighbors=args.num_nearest_neighbors,
         num_classes=data_module.rg_train.out_dim,
@@ -189,12 +189,13 @@ def cli_main():
         if not args.experiment_name \
         else args.experiment_name
 
-    # Logging everything to Neptune
-    # logger = construct_neptune_pl_logger(args)
-    # logger.experiment.log_artifact(args.ckpt_dir)  # Neptune-specific
+    # Log everything to TensorBoard
+    # logger = construct_tensorboard_pl_logger(args)
 
-    # Logging everything to TensorBoard instead of Neptune
-    logger = construct_tensorboard_pl_logger(args)
+    # Log everything to Neptune
+    logger = construct_neptune_pl_logger(args)
+
+    # Assign specified logger (e.g. Neptune) to Trainer instance
     trainer.logger = logger
 
     # Train with the provided model and data module
@@ -206,7 +207,11 @@ def cli_main():
     test_results = trainer.test()
     print(f'Model testing results on dataset: {test_results}\n')
 
-    # logger.experiment.stop()  # Halt the current Neptune experiment
+    # ------------
+    # Finalizing
+    # ------------
+    logger.experiment.log_artifact(args.ckpt_dir)
+    logger.experiment.stop()
 
 
 if __name__ == '__main__':
