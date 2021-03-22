@@ -208,7 +208,6 @@ def cli_main():
     # Finalizing
     # ------------
     logger.experiment.log_artifact(args.ckpt_dir)
-    logger.experiment.stop()
 
 
 if __name__ == '__main__':

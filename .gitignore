@@ -119,22 +119,25 @@ venv.bak/
 .idea
 .vscode
 
-# WandB
-wandb
-
-# Neptune
-project/models/**
-project/DeepInteract
+# SE(3)-Transformer
+cache
 
 # QM9
 project/datasets/QM9/QM9_data.pt
-project/cache
-
-# SE3-Transformer
-cache
 
 # PyTorch Lightning
 lightning_logs/
-checkpoints
-tb_log
 .DS_Store
+
+# WandB
+wandb
+DeepInteract
+
+# Neptune
+project/DeepInteract
+
+# TensorBoard
+tb_log
+
+# Checkpoints
+checkpoints

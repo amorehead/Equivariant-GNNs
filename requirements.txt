@@ -2,9 +2,10 @@
 setuptools==53.0.0
 click==7.1.2
 neptune-client==0.5.2
-# pytorch-lightning==1.2.4  # Install only after PyTorch (w/ CUDA support) is installed
 einops==0.3.0
 se3-transformer-pytorch==0.0.24
+wandb==0.10.23
+# pytorch-lightning==1.2.4  # Install only after PyTorch (w/ CUDA support) is installed
 
 # SE(3)-Transformer requirements
 lie-learn
