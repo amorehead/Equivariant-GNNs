@@ -5,7 +5,7 @@ import dgl
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.loggers import NeptuneLogger, TensorBoardLogger
+from pytorch_lightning.loggers import NeptuneLogger, TensorBoardLogger, WandbLogger
 from scipy.constants import physical_constants
 
 from project.utils.from_se3cnn.utils_steerable import _basis_transformation_Q_J, \
@@ -269,8 +269,9 @@ def collect_args():
     # -------------------
     # Logging parameters
     # -------------------
-    parser.add_argument('--experiment_name', type=str, default=None, help="Neptune experiment name")
-    parser.add_argument('--project_name', type=str, default='amorehead/Equivariant-GNNs', help="Neptune project name")
+    parser.add_argument('--experiment_name', type=str, default=None, help="Logger experiment name")
+    parser.add_argument('--project_name', type=str, default='equivariant-gnns', help="Logger project name")
+    parser.add_argument('--entity', type=str, default='bml-lab', help="Logger entity (i.e. team) name")
     parser.add_argument('--offline', action='store_true', dest='offline', help="Whether to log locally or remotely")
     parser.add_argument('--online', action='store_false', dest='offline', help="Whether to log locally or remotely")
     parser.add_argument('--close_after_fit', action='store_true', dest='close_after_fit',
@@ -278,7 +279,7 @@ def collect_args():
     parser.add_argument('--open_after_fit', action='store_false', dest='close_after_fit',
                         help="Whether to stop logger after calling fit")
     parser.add_argument('--tb_log_dir', type=str, default='tb_log', help="Where to store TensorBoard log files")
-    parser.set_defaults(offline=True)  # Default to using offline logging mode
+    parser.set_defaults(offline=False)  # Default to using online logging mode
     parser.set_defaults(close_after_fit=False)  # Default to keeping logger open after calling fit()
 
     # -----------------
@@ -321,6 +322,11 @@ def process_args(args):
     if not args.seed:
         args.seed = 42  # np.random.randint(100000)
     pl.seed_everything(args.seed)
+
+
+def construct_wandb_pl_logger(args):
+    """Return an instance of WandbLogger with corresponding project and name strings."""
+    return WandbLogger(name=args.experiment_name, project=args.project_name, entity=args.entity, offline=args.offline)
 
 
 def construct_neptune_pl_logger(args):

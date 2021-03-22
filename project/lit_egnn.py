@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from project.datasets.RG.rg_dgl_data_module import RGDGLDataModule
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import EnGraphConv
-from project.utils.utils import collect_args, process_args, construct_tensorboard_pl_logger, construct_neptune_pl_logger
+from project.utils.utils import collect_args, process_args, construct_wandb_pl_logger
 
 
 class LitEGNN(pl.LightningModule):
@@ -189,13 +189,10 @@ def cli_main():
         if not args.experiment_name \
         else args.experiment_name
 
-    # Log everything to TensorBoard
-    # logger = construct_tensorboard_pl_logger(args)
+    # Log everything to Weights and Biases (WandB)
+    logger = construct_wandb_pl_logger(args)
 
-    # Log everything to Neptune
-    logger = construct_neptune_pl_logger(args)
-
-    # Assign specified logger (e.g. Neptune) to Trainer instance
+    # Assign specified logger (e.g. WandB) to Trainer instance
     trainer.logger = logger
 
     # Train with the provided model and data module

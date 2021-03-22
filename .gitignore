@@ -119,6 +119,9 @@ venv.bak/
 .idea
 .vscode
 
+# WandB
+wandb
+
 # Neptune
 project/models/**
 project/DeepInteract

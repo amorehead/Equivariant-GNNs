@@ -10,7 +10,7 @@ from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
 from project.utils.modules import GAvgPooling, GSE3Res, GNormSE3, GConvSE3, GMaxPooling
-from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_neptune_pl_logger
+from project.utils.utils import collect_args, process_args, get_basis_and_r, construct_wandb_pl_logger
 
 
 class LitSET(pl.LightningModule):
@@ -219,13 +219,10 @@ def cli_main():
         if not args.experiment_name \
         else args.experiment_name
 
-    # Log everything to TensorBoard
-    # logger = construct_tensorboard_pl_logger(args)
+    # Log everything to Weights and Biases (WandB)
+    logger = construct_wandb_pl_logger(args)
 
-    # Log everything to Neptune
-    logger = construct_neptune_pl_logger(args)
-
-    # Assign specified logger (e.g. Neptune) to Trainer instance
+    # Assign specified logger (e.g. WandB) to Trainer instance
     trainer.logger = logger
 
     # Train with the provided model and data module
