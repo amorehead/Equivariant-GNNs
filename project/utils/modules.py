@@ -723,6 +723,16 @@ class EnInvGraphConv(nn.Module):
             Coordinates feature size.
         fourier_feat : int
             Fourier feature size.
+        norm_rel_coords : boolean
+            Fourier feature size.
+        norm_coord_weights : boolean
+            Fourier feature size.
+        num_nearest_neighbors : int
+            Fourier feature size.
+        dropout : float
+            Fourier feature size.
+        init_eps : float
+            Fourier feature size.
         """
         super().__init__()
         self.fourier_feat = fourier_feat
@@ -747,6 +757,7 @@ class EnInvGraphConv(nn.Module):
 
         self.norm_coord_weights = norm_coord_weights
         self.norm_rel_coords = norm_rel_coords
+
         if norm_rel_coords:
             self.rel_coords_scale = nn.Parameter(torch.ones(1))
 
@@ -838,7 +849,7 @@ class EnInvGraphConv(nn.Module):
 
 
 class EnGraphConv(nn.Module):
-    """A graph neural network layer as a DGL module.
+    """A graph neural network layer.
 
     EnGraphConv stands for a Graph Convolution E(n)-equivariant layer. It is the
     equivalent of a linear layer in an MLP, a conv layer in a CNN, or a graph
@@ -869,6 +880,16 @@ class EnGraphConv(nn.Module):
             Coordinates feature size.
         fourier_feat : int
             Fourier feature size.
+        norm_rel_coords : boolean
+            Fourier feature size.
+        norm_coord_weights : boolean
+            Fourier feature size.
+        num_nearest_neighbors : int
+            Fourier feature size.
+        dropout : float
+            Fourier feature size.
+        init_eps : float
+            Fourier feature size.
         """
         super().__init__()
         self.fourier_feat = fourier_feat
@@ -893,6 +914,7 @@ class EnGraphConv(nn.Module):
 
         self.norm_coord_weights = norm_coord_weights
         self.norm_rel_coords = norm_rel_coords
+
         if norm_rel_coords:
             self.rel_coords_scale = nn.Parameter(torch.ones(1))
 
@@ -927,9 +949,9 @@ class EnGraphConv(nn.Module):
         mask : Tensor
             The coordinate mask to apply.
         """
+        nbhd_indices = None
         b, n, d, fourier_features, num_nearest = *h.shape, self.fourier_feat, self.num_nearest_neighbors
         use_nearest = num_nearest > 0
-        nbhd_indices = None
 
         rel_coords = rearrange(x, 'b i d -> b i () d') - rearrange(x, 'b j d -> b () j d')
         rel_dist = (rel_coords ** 2).sum(dim=-1, keepdim=True)
