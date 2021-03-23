@@ -242,22 +242,23 @@ def collect_args():
     # -------------------
     # Model parameters
     # -------------------
-    parser.add_argument('--num_layers', type=int, default=4, help="Number of equivariant layers")
-    parser.add_argument('--num_degrees', type=int, default=4, help="Number of irreps {0,1,...,num_degrees-1}")
-    parser.add_argument('--num_channels', type=int, default=32, help="Number of channels in middle layers")
-    parser.add_argument('--num_nlayers', type=int, default=0, help="Number of layers for nonlinearity")
-    parser.add_argument('--fully_connected', action='store_true', default=False, help="Include global node in graph")
-    parser.add_argument('--div', type=float, default=2.0, help="Low dimensional embedding fraction")
-    parser.add_argument('--pooling', type=str, default='max', help="Choose from avg or max")
-    parser.add_argument('--head', type=int, default=1, help="Number of attention heads")
-    parser.add_argument('--num_nearest_neighbors', type=int, default=3, help="Neighbor count threshold to define edges")
+    parser.add_argument('--num_layers', type=int, default=2, help='Number of equivariant layers')
+    parser.add_argument('--num_degrees', type=int, default=2, help='Number of irreps {0,1,...,num_degrees-1}')
+    parser.add_argument('--output_dim', type=int, default=1, help='Dimensionality of the network output')
+    parser.add_argument('--num_channels', type=int, default=32, help='Number of channels in hidden layers')
+    parser.add_argument('--num_nlayers', type=int, default=1, help='Number of layers for nonlinearity')
+    parser.add_argument('--fully_connected', action='store_true', help='Include global node in graph')
+    parser.add_argument('--div', type=float, default=4.0, help='Low dimensional embedding fraction')
+    parser.add_argument('--pooling', type=str, default='avg', help='Choose from avg or max')
+    parser.add_argument('--head', type=int, default=1, help='Number of attention heads')
+    parser.add_argument('--num_nearest_neighbors', type=int, default=3, help='Neighbor count threshold to define edges')
 
     # -------------------
     # Meta-parameters
     # -------------------
     parser.add_argument('--batch_size', type=int, default=4, help='Number of samples included in each data batch')
-    parser.add_argument('--lr', type=float, default=1e-4, help="Learning rate")
-    parser.add_argument('--num_epochs', type=int, default=5, help="Maximum number of epochs to run for training")
+    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--num_epochs', type=int, default=5, help='Maximum number of epochs to run for training')
 
     # -----------------
     # Data parameters
@@ -269,16 +270,16 @@ def collect_args():
     # -------------------
     # Logging parameters
     # -------------------
-    parser.add_argument('--experiment_name', type=str, default=None, help="Logger experiment name")
-    parser.add_argument('--project_name', type=str, default='equivariant-gnns', help="Logger project name")
-    parser.add_argument('--entity', type=str, default='bml-lab', help="Logger entity (i.e. team) name")
-    parser.add_argument('--offline', action='store_true', dest='offline', help="Whether to log locally or remotely")
-    parser.add_argument('--online', action='store_false', dest='offline', help="Whether to log locally or remotely")
+    parser.add_argument('--experiment_name', type=str, default=None, help='Logger experiment name')
+    parser.add_argument('--project_name', type=str, default='equivariant-gnns', help='Logger project name')
+    parser.add_argument('--entity', type=str, default='bml-lab', help='Logger entity (i.e. team) name')
+    parser.add_argument('--offline', action='store_true', dest='offline', help='Whether to log locally or remotely')
+    parser.add_argument('--online', action='store_false', dest='offline', help='Whether to log locally or remotely')
     parser.add_argument('--close_after_fit', action='store_true', dest='close_after_fit',
-                        help="Whether to stop logger after calling fit")
+                        help='Whether to stop logger after calling fit')
     parser.add_argument('--open_after_fit', action='store_false', dest='close_after_fit',
-                        help="Whether to stop logger after calling fit")
-    parser.add_argument('--tb_log_dir', type=str, default='tb_log', help="Where to store TensorBoard log files")
+                        help='Whether to stop logger after calling fit')
+    parser.add_argument('--tb_log_dir', type=str, default='tb_log', help='Where to store TensorBoard log files')
     parser.set_defaults(offline=False)  # Default to using online logging mode
     parser.set_defaults(close_after_fit=False)  # Default to keeping logger open after calling fit()
 
@@ -290,12 +291,13 @@ def collect_args():
     # -------------------
     # Miscellaneous
     # -------------------
-    parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help="Backend to use for multi-GPU training")
-    parser.add_argument('--num_gpus', type=int, default=-1, help="Number of GPUs to use (e.g. -1 = all available GPUs)")
+    parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help='Backend to use for multi-GPU training')
+    parser.add_argument('--num_gpus', type=int, default=-1, help='Number of GPUs to use (e.g. -1 = all available GPUs)')
     parser.add_argument('--num_workers', type=int, default=6, help='Number of CPU threads for loading data')
-    parser.add_argument('--profiler_method', type=str, default='simple', help="PyTorch Lightning profiler to use")
-    parser.add_argument('--ckpt_dir', type=str, default="checkpoints", help="Directory in which to save checkpoints")
-    parser.add_argument('--ckpt_name', type=str, default=None, help="Filename of best checkpoint")
+    parser.add_argument('--profiler_method', type=str, default='simple', help='PyTorch Lightning profiler to use')
+    parser.add_argument('--ckpt_dir', type=str, default=f'{os.path.join(os.getcwd(), "checkpoints")}',
+                        help='Directory in which to save checkpoints')
+    parser.add_argument('--ckpt_name', type=str, default=None, help='Filename of best checkpoint')
 
     # Parse all known arguments
     args, unparsed_argv = parser.parse_known_args()
@@ -326,7 +328,8 @@ def process_args(args):
 
 def construct_wandb_pl_logger(args):
     """Return an instance of WandbLogger with corresponding project and name strings."""
-    return WandbLogger(name=args.experiment_name, project=args.project_name, entity=args.entity, offline=args.offline)
+    return WandbLogger(name=args.experiment_name, project=args.project_name,
+                       entity=args.entity, offline=args.offline, log_model=True)
 
 
 def construct_neptune_pl_logger(args):

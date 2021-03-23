@@ -6,6 +6,7 @@ from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
+import wandb
 from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
@@ -108,6 +109,11 @@ class LitTFN(pl.LightningModule):
         output = {'loss': l1_loss}  # The loss key here is required
         return output
 
+    def training_epoch_end(self, outs):
+        """Lightning calls this at the end of every training epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
+
     def validation_step(self, graph_and_y, batch_idx):
         """Lightning calls this inside the validation loop."""
         graph = graph_and_y[0]
@@ -129,6 +135,11 @@ class LitTFN(pl.LightningModule):
         output = {'loss': rescaled_l1_loss}  # The loss key here is required
         return output
 
+    def validation_epoch_end(self, outs):
+        """Lightning calls this at the end of every validation epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
+
     def test_step(self, graph_and_y, batch_idx):
         """Lightning calls this inside the test loop."""
         graph = graph_and_y[0]
@@ -149,6 +160,11 @@ class LitTFN(pl.LightningModule):
         # Assemble and return the test step output
         output = {'loss': rescaled_l1_loss}  # The loss key here is required
         return output
+
+    def test_epoch_end(self, outs):
+        """Lightning calls this at the end of every testing epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
 
     # ---------------------
     # Training Setup
@@ -194,25 +210,8 @@ def cli_main():
                      mean=data_module.mean,
                      task=args.task)
 
-    # -----------
-    # Training
-    # -----------
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.max_epochs = args.num_epochs
-
-    # Resume from checkpoint if path to a valid one is provided
-    args.ckpt_name = args.ckpt_name \
-        if args.ckpt_name is not None \
-        else 'LitTFN-{epoch:02d}-{val_rescaled_l1_loss:.2f}.ckpt'
-    checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
-    trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
-
-    # Create and use callbacks
-    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
-    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.ckpt_dir,
-                                          filename='LitTFN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
-    lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
-    trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
 
     # Initialize logger
     args.experiment_name = f'TFN-d{args.num_degrees}-l{args.num_layers}-{args.num_channels}-{args.num_nlayers}' \
@@ -224,6 +223,26 @@ def cli_main():
 
     # Assign specified logger (e.g. WandB) to Trainer instance
     trainer.logger = logger
+
+    # -----------
+    # Checkpoint
+    # -----------
+    # Resume from checkpoint if path to a valid one is provided
+    args.ckpt_name = args.ckpt_name \
+        if args.ckpt_name is not None \
+        else 'LitTFN-{epoch:02d}-{val_rescaled_l1_loss:.2f}.ckpt'
+    checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
+    trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
+
+    # -----------
+    # Training
+    # -----------
+    # Create and use callbacks
+    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
+    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.ckpt_dir,
+                                          filename='LitTFN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
+    lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
+    trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
 
     # Train with the provided model and data module
     trainer.fit(lit_tfn, datamodule=data_module)
@@ -237,7 +256,7 @@ def cli_main():
     # ------------
     # Finalizing
     # ------------
-    logger.experiment.log_artifact(args.ckpt_dir)
+    wandb.save(checkpoint_callback.best_model_path)
 
 
 if __name__ == '__main__':

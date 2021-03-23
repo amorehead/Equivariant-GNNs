@@ -2,6 +2,7 @@ import os
 
 import pytorch_lightning as pl
 import torch
+import wandb
 from einops import rearrange
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from torch.nn import ModuleList
@@ -80,6 +81,11 @@ class LitEGNN(pl.LightningModule):
 
         return l1_loss
 
+    def training_epoch_end(self, outs):
+        """Lightning calls this at the end of every training epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
+
     def validation_step(self, graph_and_labels, batch_idx):
         """Lightning calls this inside the validation loop."""
         h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
@@ -100,6 +106,11 @@ class LitEGNN(pl.LightningModule):
 
         return rescaled_l1_loss
 
+    def validation_epoch_end(self, outs):
+        """Lightning calls this at the end of every validation epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
+
     def test_step(self, graph_and_labels, batch_idx):
         """Lightning calls this inside the testing loop."""
         h = rearrange(graph_and_labels[0].ndata['f'], 'n d () -> () n d')
@@ -119,6 +130,11 @@ class LitEGNN(pl.LightningModule):
         self.log('test_l2_loss', l2_loss)
 
         return rescaled_l1_loss
+
+    def test_epoch_end(self, outs):
+        """Lightning calls this at the end of every testing epoch."""
+        self.L1Loss.reset()
+        self.L2Loss.reset()
 
     # ---------------------
     # Training Setup
@@ -164,25 +180,8 @@ def cli_main():
         lr=args.lr,
         num_epochs=args.num_epochs)
 
-    # -----------
-    # Training
-    # -----------
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.max_epochs = args.num_epochs
-
-    # Resume from checkpoint if path to a valid one is provided
-    args.ckpt_name = args.ckpt_name \
-        if args.ckpt_name is not None \
-        else 'LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}.ckpt'
-    checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
-    trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
-
-    # Create and use callbacks
-    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
-    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.ckpt_dir,
-                                          filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
-    lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
-    trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
 
     # Initialize logger
     args.experiment_name = f'EGNN-l{args.num_layers}-c{args.num_channels}' \
@@ -194,6 +193,26 @@ def cli_main():
 
     # Assign specified logger (e.g. WandB) to Trainer instance
     trainer.logger = logger
+
+    # -----------
+    # Checkpoint
+    # -----------
+    # Resume from checkpoint if path to a valid one is provided
+    args.ckpt_name = args.ckpt_name \
+        if args.ckpt_name is not None \
+        else 'LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}.ckpt'
+    checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
+    trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
+
+    # -----------
+    # Training
+    # -----------
+    # Create and use callbacks
+    early_stop_callback = EarlyStopping(monitor='val_rescaled_l1_loss', mode='min', min_delta=0.00, patience=3)
+    checkpoint_callback = ModelCheckpoint(monitor='val_rescaled_l1_loss', save_top_k=3, dirpath=args.ckpt_dir,
+                                          filename='LitEGNN-{epoch:02d}-{val_rescaled_l1_loss:.2f}')
+    lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
+    trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
 
     # Train with the provided model and data module
     trainer.fit(lit_egnn, datamodule=data_module)
@@ -207,7 +226,7 @@ def cli_main():
     # ------------
     # Finalizing
     # ------------
-    logger.experiment.log_artifact(args.ckpt_dir)
+    wandb.save(checkpoint_callback.best_model_path)
 
 
 if __name__ == '__main__':
