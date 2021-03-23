@@ -314,7 +314,7 @@ def process_args(args):
     # Model directory creation
     # ---------------------------------------
     if not os.path.exists(args.ckpt_dir):
-        os.mkdir(args.ckpt_dir)
+        os.makedirs(args.ckpt_dir, exist_ok=True)
 
     # ---------------------------------------
     # Seed fixing for random numbers
