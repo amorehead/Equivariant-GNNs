@@ -94,7 +94,7 @@ class LitTFN(pl.LightningModule):
         y = graph_and_y[1]
 
         # Make a forward pass through the network
-        logits = self.forward(graph)
+        logits = self(graph)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(logits, y)
@@ -120,7 +120,7 @@ class LitTFN(pl.LightningModule):
         y = graph_and_y[1]
 
         # Make a forward pass through the network
-        logits = self.forward(graph)
+        logits = self(graph)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(logits, y)
@@ -146,7 +146,7 @@ class LitTFN(pl.LightningModule):
         y = graph_and_y[1]
 
         # Make a forward pass through the network
-        logits = self.forward(graph)
+        logits = self(graph)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(logits, y)

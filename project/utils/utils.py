@@ -329,7 +329,7 @@ def process_args(args):
 def construct_wandb_pl_logger(args):
     """Return an instance of WandbLogger with corresponding project and name strings."""
     return WandbLogger(name=args.experiment_name, project=args.project_name,
-                       entity=args.entity, offline=args.offline, log_model=True)
+                       entity=args.entity, offline=args.offline)
 
 
 def construct_neptune_pl_logger(args):

@@ -68,7 +68,7 @@ class LitEGNN(pl.LightningModule):
         y = graph_and_labels[1]
 
         # Make a forward pass through the network
-        h, x = self.forward(h, x)
+        h, x = self(h, x)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
@@ -93,7 +93,7 @@ class LitEGNN(pl.LightningModule):
         y = graph_and_labels[1]
 
         # Make a forward pass through the network
-        h, x = self.forward(h, x)
+        h, x = self(h, x)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
@@ -118,7 +118,7 @@ class LitEGNN(pl.LightningModule):
         y = graph_and_labels[1]
 
         # Make a forward pass through the network
-        h, x = self.forward(h, x)
+        h, x = self(h, x)
 
         # Calculate the loss
         l1_loss, rescaled_l1_loss = self.L1Loss(h, y)
