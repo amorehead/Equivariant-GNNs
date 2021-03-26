@@ -31,7 +31,8 @@ cd "$PROJDIR"/project || exit
 START=$(date +%s)  # Capture script start time in seconds since Unix epoch
 echo "Script started at $(date)"
 
-python3 lit_set.py  # Execute script
+# Execute script
+python3 lit_set.py --num_layers 2 --num_channels 32 --num_nearest_neighbors 3 --batch_size 4 --lr 0.001 --num_epochs 25 num_workers 28
 
 END=$(date +%s)  # Capture script end time in seconds since Unix epoch
 echo "Script finished at $(date)"

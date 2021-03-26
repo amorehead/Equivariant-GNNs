@@ -16,6 +16,9 @@
 export PROJDIR=$MEMBERWORK/bip198/Repositories/Lab_Repositories/Equivariant-GNNs
 export DGLBACKEND=pytorch  # Required to override default ~/.dgl config directory which is read-only
 
+# Configure OMP for PyTorch
+export OMP_PLACES=threads
+
 # Configure Conda for BSUB script environment
 eval "$(conda shell.bash hook)"
 
@@ -37,7 +40,8 @@ cd "$PROJDIR"/project || exit
 START=$(date +%s)  # Capture script start time in seconds since Unix epoch
 echo "Script started at $(date)"
 
-jsrun -bpacked:7 -g6 -a6 -c42 -r1 python lit_set.py  # Execute script
+# Execute script
+jsrun -bpacked:7 -g6 -a6 -c42 -r1 python lit_set.py --num_layers 2 --num_channels 32 --num_nearest_neighbors 3 --batch_size 4 --lr 0.001 --num_epochs 25 num_workers 28
 
 END=$(date +%s)  # Capture script end time in seconds since Unix epoch
 echo "Script finished at $(date)"

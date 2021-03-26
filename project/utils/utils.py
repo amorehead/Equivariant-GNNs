@@ -242,7 +242,7 @@ def collect_args():
     # -------------------
     # Model parameters
     # -------------------
-    parser.add_argument('--num_layers', type=int, default=2, help='Number of equivariant layers')
+    parser.add_argument('--num_layers', type=int, default=2, help='Number of layers')
     parser.add_argument('--num_degrees', type=int, default=2, help='Number of irreps {0,1,...,num_degrees-1}')
     parser.add_argument('--output_dim', type=int, default=1, help='Dimensionality of the network output')
     parser.add_argument('--num_channels', type=int, default=32, help='Number of channels in hidden layers')
@@ -257,7 +257,7 @@ def collect_args():
     # Meta-parameters
     # -------------------
     parser.add_argument('--batch_size', type=int, default=4, help='Number of samples included in each data batch')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--num_epochs', type=int, default=5, help='Maximum number of epochs to run for training')
 
     # -----------------
