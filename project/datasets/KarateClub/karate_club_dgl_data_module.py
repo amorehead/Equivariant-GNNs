@@ -1,17 +1,13 @@
-import dgl
-from dgl.data import CoraFullDataset, CoraGraphDataset
+from dgl.data import KarateClubDataset
 from pytorch_lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
 
-class CoraDGLDataModule(LightningDataModule):
-    """Cora data module for DGL with PyTorch."""
+class KarateClubDGLDataModule(LightningDataModule):
+    """Karate club data module for DGL with PyTorch."""
 
     # Dataset partition instantiations
-    cora_graph_dataset = None
-    cora_graph_dataset_train = None
-    cora_graph_dataset_val = None
-    cora_graph_dataset_test = None
+    karate_club_dataset = None
 
     def __init__(self, batch_size=1, num_dataloader_workers=1):
         super().__init__()
@@ -22,7 +18,7 @@ class CoraDGLDataModule(LightningDataModule):
 
     @property
     def num_node_features(self) -> int:
-        return 1433
+        return 5
 
     @property
     def num_pos_features(self) -> int:
@@ -40,21 +36,24 @@ class CoraDGLDataModule(LightningDataModule):
     def num_fourier_features(self) -> int:
         return 0
 
+    @property
+    def num_classes(self) -> int:
+        return 2
+
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU
-        self.cora_graph_dataset = CoraGraphDataset()
-        self.cora_graph_dataset.download()
+        self.karate_club_dataset = KarateClubDataset()
+        self.karate_club_dataset.download()
 
-    def collate_fn(self, samples):
-        """A custom collate function for working with the DGL built-in CoraGraphDataset."""
-        graph = samples[0]
+    def collate_fn(self, dataset):
+        """A custom collate function for working with the DGL built-in KarateClubDataset."""
+        graph = dataset[0]
         return graph
 
     def setup(self, stage=None):
         # Assign training/validation/testing data set for use in DataLoaders - called on every GPU
-        self.cora_graph_dataset_train, self.cora_graph_dataset_val, self.cora_graph_dataset_test = \
-            dgl.data.utils.split_dataset(self.cora_graph_dataset, frac_list=None, shuffle=False, random_state=None)
+        pass
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.cora_graph_dataset, batch_size=self.batch_size, shuffle=False,
+        return DataLoader(self.karate_club_dataset, batch_size=self.batch_size, shuffle=False,
                           num_workers=self.num_dataloader_workers, collate_fn=self.collate_fn)
