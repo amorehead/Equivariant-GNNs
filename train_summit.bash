@@ -6,8 +6,7 @@
 #BSUB -W 00:10
 #BSUB -nnodes 2
 #BSUB -q batch-hm
-#BSUB -alloc_flags "gpumps"
-#BSUB -alloc_flags "NMVE"
+#BSUB -alloc_flags "gpumps NVME"
 #BSUB -o /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB -e /gpfs/alpine/scratch/acmwhb/bip198/Repositories/Lab_Repositories/Equivariant-GNNs/job%J.out
 #BSUB --signal=SIGUSR1@90
