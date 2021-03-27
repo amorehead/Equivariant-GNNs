@@ -21,7 +21,7 @@ class LitEGNN(pl.LightningModule):
     def __init__(self, node_feat: int = 512, pos_feat: int = 3, coord_feat: int = 16, edge_feat: int = 0,
                  fourier_feat: int = 0, num_nearest_neighbors: int = 3, num_classes: int = 2, num_layers: int = 4,
                  lr: float = 1e-3, num_epochs: int = 5):
-        """Initialize all the parameters for an EGNN."""
+        """Initialize all the parameters for a LitEGNN."""
         super().__init__()
         self.save_hyperparameters()
 
@@ -38,14 +38,14 @@ class LitEGNN(pl.LightningModule):
         self.num_epochs = num_epochs
 
         # Assemble the layers of the network
-        self.build_gcn_model()
+        self.build_gnn_model()
 
         # Declare loss function(s) for training, validation, and testing
         self.L1Loss = L1Loss(1, 0, 'homo')
         self.L2Loss = L2Loss()
 
-    def build_gcn_model(self):
-        """Define the layers of a single EGNN."""
+    def build_gnn_model(self):
+        """Define the layers of a LitEGNN."""
         # Marshal all equivariant layers
         self.conv_block = ModuleList([EnGraphConv(node_feat=self.node_feat, edge_feat=self.edge_feat,
                                                   coord_feat=self.coord_feat, fourier_feat=self.fourier_feat,
