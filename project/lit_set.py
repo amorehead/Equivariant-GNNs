@@ -1,12 +1,12 @@
 import os
 
 import pytorch_lightning as pl
+import wandb
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from torch.nn import Linear, ReLU, ModuleList
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-import wandb
 from project.datasets.QM9.qm9_dgl_data_module import QM9DGLDataModule
 from project.utils.fibers import Fiber
 from project.utils.metrics import L1Loss, L2Loss
@@ -219,6 +219,7 @@ def cli_main():
         else args.experiment_name
 
     # Log everything to Weights and Biases (WandB)
+    run = wandb.init(name=args.experiment_name, project=args.project_name, entity=args.entity, reinit=True)
     logger = construct_wandb_pl_logger(args)
 
     # Assign specified logger (e.g. WandB) to Trainer instance
@@ -250,13 +251,13 @@ def cli_main():
     # -----------
     # Testing
     # -----------
-    test_results = trainer.test()
-    print(f'Model testing results on dataset: {test_results}\n')
+    trainer.test()
 
     # ------------
     # Finalizing
     # ------------
-    wandb.save(checkpoint_callback.best_model_path)
+    run.save(checkpoint_callback.best_model_path)
+    run.finish()
 
 
 if __name__ == '__main__':

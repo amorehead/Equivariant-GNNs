@@ -242,10 +242,10 @@ def collect_args():
     # -------------------
     # Model parameters
     # -------------------
-    parser.add_argument('--num_layers', type=int, default=2, help='Number of layers')
+    parser.add_argument('--num_layers', type=int, default=0, help='Number of layers')
     parser.add_argument('--num_degrees', type=int, default=2, help='Number of irreps {0,1,...,num_degrees-1}')
     parser.add_argument('--output_dim', type=int, default=1, help='Dimensionality of the network output')
-    parser.add_argument('--num_channels', type=int, default=32, help='Number of channels in hidden layers')
+    parser.add_argument('--num_channels', type=int, default=5, help='Number of channels in hidden layers')
     parser.add_argument('--num_nlayers', type=int, default=1, help='Number of layers for nonlinearity')
     parser.add_argument('--fully_connected', action='store_true', help='Include global node in graph')
     parser.add_argument('--div', type=float, default=4.0, help='Low dimensional embedding fraction')
@@ -256,9 +256,9 @@ def collect_args():
     # -------------------
     # Meta-parameters
     # -------------------
-    parser.add_argument('--batch_size', type=int, default=4, help='Number of samples included in each data batch')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--num_epochs', type=int, default=5, help='Maximum number of epochs to run for training')
+    parser.add_argument('--batch_size', type=int, default=1, help='Number of samples included in each data batch')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--num_epochs', type=int, default=50, help='Maximum number of epochs to run for training')
 
     # -----------------
     # Data parameters
