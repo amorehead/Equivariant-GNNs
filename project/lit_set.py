@@ -107,9 +107,9 @@ class LitSET(pl.LightningModule):
         l2_loss = self.L2Loss(logits, y)
 
         # Log training metrics
-        self.log('train_l1_loss', l1_loss)
-        self.log('train_rescaled_l1_loss', rescaled_l1_loss)
-        self.log('train_l2_loss', l2_loss)
+        self.log('train_l1_loss', l1_loss, sync_dist=True)
+        self.log('train_rescaled_l1_loss', rescaled_l1_loss, sync_dist=True)
+        self.log('train_l2_loss', l2_loss, sync_dist=True)
 
         return l1_loss
 
@@ -131,9 +131,9 @@ class LitSET(pl.LightningModule):
         l2_loss = self.L2Loss(logits, y)
 
         # Log validation metrics
-        self.log('val_l1_loss', l1_loss)
-        self.log('val_rescaled_l1_loss', rescaled_l1_loss)
-        self.log('val_l2_loss', l2_loss)
+        self.log('val_l1_loss', l1_loss, sync_dist=True)
+        self.log('val_rescaled_l1_loss', rescaled_l1_loss, sync_dist=True)
+        self.log('val_l2_loss', l2_loss, sync_dist=True)
 
         return rescaled_l1_loss
 
@@ -155,9 +155,9 @@ class LitSET(pl.LightningModule):
         l2_loss = self.L2Loss(logits, y)
 
         # Log test metrics
-        self.log('test_l1_loss', l1_loss)
-        self.log('test_rescaled_l1_loss', rescaled_l1_loss)
-        self.log('test_l2_loss', l2_loss)
+        self.log('test_l1_loss', l1_loss, sync_dist=True)
+        self.log('test_rescaled_l1_loss', rescaled_l1_loss, sync_dist=True)
+        self.log('test_l2_loss', l2_loss, sync_dist=True)
 
         return rescaled_l1_loss
 

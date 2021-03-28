@@ -1,5 +1,6 @@
 from dgl.data import KarateClubDataset
 from pytorch_lightning import LightningDataModule
+from torch.nn import Embedding
 from torch.utils.data.dataloader import DataLoader
 
 

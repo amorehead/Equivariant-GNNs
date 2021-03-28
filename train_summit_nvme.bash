@@ -58,6 +58,6 @@ echo "Script took $hours hour(s) to execute"
 
 # Copying leftover items from NVMe drive back to GPFS
 echo "Copying log files and best checkpoint(s) back to GPFS..."
-jsrun -n 1 cp /mnt/bb/$USER/tb_log/* /gpfs/alpine/scratch/$USER/$PROJID/Repositories/Lab_Repositories/Equivariant-GNNs/project/tb_log
-jsrun -n 1 cp /mnt/bb/$USER/checkpoints/* /gpfs/alpine/scratch/$USER/$PROJID/Repositories/Lab_Repositories/Equivariant-GNNs/project/checkpoints
+jsrun -n 1 cp -r /mnt/bb/$USER/tb_log /gpfs/alpine/scratch/$USER/$PROJID/Repositories/Lab_Repositories/Equivariant-GNNs/project/tb_log
+jsrun -n 1 cp -r /mnt/bb/$USER/checkpoints /gpfs/alpine/scratch/$USER/$PROJID/Repositories/Lab_Repositories/Equivariant-GNNs/project/checkpoints
 echo "Done copying log files and best checkpoint(s) back to GPFS"

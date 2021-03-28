@@ -111,7 +111,7 @@ class LitDAGNN(pl.LightningModule):
         bce = self.bce(logits, labels.float())  # Calculate BCE of a single batch
 
         # Log training step metric(s)
-        self.log('train_bce', bce)
+        self.log('train_bce', bce, sync_dist=True)
 
         return {'loss': bce}
 
@@ -134,9 +134,9 @@ class LitDAGNN(pl.LightningModule):
 
     def validation_epoch_end(self, outs):
         """Lightning calls this at the end of every validation epoch."""
-        self.log('val_acc', self.val_acc.compute())  # Log Accuracy of an epoch
-        self.log('val_auroc', self.val_auroc.compute())  # Log AUROC of an epoch
-        self.log('val_auprc', self.val_auprc.compute())  # Log AveragePrecision of an epoch
+        self.log('val_acc', self.val_acc.compute(), sync_dist=True)  # Log Accuracy of an epoch
+        self.log('val_auroc', self.val_auroc.compute(), sync_dist=True)  # Log AUROC of an epoch
+        self.log('val_auprc', self.val_auprc.compute(), sync_dist=True)  # Log AveragePrecision of an epoch
         self.val_acc.reset()
         self.val_auroc.reset()
         self.val_auprc.reset()
@@ -160,9 +160,9 @@ class LitDAGNN(pl.LightningModule):
 
     def test_epoch_end(self, outs):
         """Lightning calls this at the end of every test epoch."""
-        self.log('test_acc', self.test_acc.compute())  # Log Accuracy of an epoch
-        self.log('test_auroc', self.test_auroc.compute())  # Log AUROC of an epoch
-        self.log('test_auprc', self.test_auprc.compute())  # Log AveragePrecision of an epoch
+        self.log('test_acc', self.test_acc.compute(), sync_dist=True)  # Log Accuracy of an epoch
+        self.log('test_auroc', self.test_auroc.compute(), sync_dist=True)  # Log AUROC of an epoch
+        self.log('test_auprc', self.test_auprc.compute(), sync_dist=True)  # Log AveragePrecision of an epoch
         self.test_acc.reset()
         self.test_auroc.reset()
         self.test_auprc.reset()
@@ -192,8 +192,7 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    karate_club_data_module = KarateClubDGLDataModule(batch_size=args.batch_size,
-                                                      num_dataloader_workers=args.num_workers)
+    karate_club_data_module = KarateClubDGLDataModule(batch_size=1, num_dataloader_workers=args.num_workers)
     karate_club_data_module.prepare_data()
     karate_club_data_module.setup()
 
