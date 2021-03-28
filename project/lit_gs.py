@@ -2,16 +2,15 @@ import os
 
 import pytorch_lightning as pl
 import torch
+import wandb
 from dgl.nn.pytorch import GraphConv
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from torch import softmax
-from torch.nn import ModuleList, ReLU, Embedding, CrossEntropyLoss
+from torch.nn import Embedding, CrossEntropyLoss
 from torch.optim import Adam
 from torchmetrics import Accuracy
 
-import wandb
 from project.datasets.KarateClub.karate_club_dgl_data_module import KarateClubDGLDataModule
-from project.utils.modules import SAGEConv
 from project.utils.utils import collect_args, process_args, construct_wandb_pl_logger
 
 
@@ -47,11 +46,6 @@ class LitGraphSAGE(pl.LightningModule):
     def build_gnn_model(self):
         """Define the layers of a LitGraphSAGE GNN."""
         # Marshal all GNN layers
-        # conv_block = [SAGEConv(self.node_feat, self.hidden_dim), ReLU()]
-        # for _ in range(self.num_hidden_layers):
-        #     conv_block.extend([SAGEConv(self.hidden_dim, self.hidden_dim), ReLU()])
-        # conv_block.append(SAGEConv(self.hidden_dim, self.num_classes))
-        # return ModuleList(conv_block)
         self.conv1 = GraphConv(self.node_feat, self.hidden_dim)
         self.conv2 = GraphConv(self.hidden_dim, self.num_classes)
 
@@ -60,9 +54,6 @@ class LitGraphSAGE(pl.LightningModule):
     # ---------------------
     def gnn_forward(self, graph, feats):
         """Make a forward pass through the entire network."""
-        # for i in range(len(self.conv_block)):
-        #     feats = self.conv_block[i](feats) if i % 2 == 1 else self.conv_block[i](graph, feats)
-        # return feats
         logits = self.conv1(graph, feats)
         logits = torch.relu(logits)
         logits = self.conv2(graph, logits)
@@ -147,7 +138,6 @@ def cli_main():
         else args.experiment_name
 
     # Log everything to Weights and Biases (WandB)
-    run = wandb.init(name=args.experiment_name, project=args.project_name, entity=args.entity, reinit=True)
     logger = construct_wandb_pl_logger(args)
 
     # Assign specified logger (e.g. WandB) to Trainer instance
@@ -178,12 +168,6 @@ def cli_main():
     # Testing
     # -----------
     trainer.test()
-
-    # ------------
-    # Finalizing
-    # ------------
-    run.save(checkpoint_callback.best_model_path)
-    run.finish()
 
 
 if __name__ == '__main__':
