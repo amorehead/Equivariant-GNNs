@@ -1,6 +1,5 @@
 from dgl.data import KarateClubDataset
 from pytorch_lightning import LightningDataModule
-from torch.nn import Embedding
 from torch.utils.data.dataloader import DataLoader
 
 
@@ -36,10 +35,6 @@ class KarateClubDGLDataModule(LightningDataModule):
     @property
     def num_fourier_features(self) -> int:
         return 0
-
-    @property
-    def num_classes(self) -> int:
-        return 2
 
     def prepare_data(self):
         # Download the full dataset - called only on 1 GPU

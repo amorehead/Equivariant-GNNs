@@ -1,5 +1,4 @@
-import dgl
-from dgl.data import CoraFullDataset, CoraGraphDataset
+from dgl.data import CoraGraphDataset
 from pytorch_lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
@@ -45,15 +44,14 @@ class CoraDGLDataModule(LightningDataModule):
         self.cora_graph_dataset = CoraGraphDataset()
         self.cora_graph_dataset.download()
 
-    def collate_fn(self, samples):
+    def collate_fn(self, dataset):
         """A custom collate function for working with the DGL built-in CoraGraphDataset."""
-        graph = samples[0]
+        graph = dataset[0]
         return graph
 
     def setup(self, stage=None):
         # Assign training/validation/testing data set for use in DataLoaders - called on every GPU
-        self.cora_graph_dataset_train, self.cora_graph_dataset_val, self.cora_graph_dataset_test = \
-            dgl.data.utils.split_dataset(self.cora_graph_dataset, frac_list=None, shuffle=False, random_state=None)
+        pass
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.cora_graph_dataset, batch_size=self.batch_size, shuffle=False,

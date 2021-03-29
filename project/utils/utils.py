@@ -245,7 +245,7 @@ def collect_args():
     parser.add_argument('--num_layers', type=int, default=0, help='Number of layers')
     parser.add_argument('--num_degrees', type=int, default=2, help='Number of irreps {0,1,...,num_degrees-1}')
     parser.add_argument('--output_dim', type=int, default=1, help='Dimensionality of the network output')
-    parser.add_argument('--num_channels', type=int, default=5, help='Number of channels in hidden layers')
+    parser.add_argument('--num_channels', type=int, default=16, help='Number of channels in hidden layers')
     parser.add_argument('--num_nlayers', type=int, default=1, help='Number of layers for nonlinearity')
     parser.add_argument('--fully_connected', action='store_true', help='Include global node in graph')
     parser.add_argument('--div', type=float, default=4.0, help='Low dimensional embedding fraction')
@@ -258,7 +258,9 @@ def collect_args():
     # -------------------
     parser.add_argument('--batch_size', type=int, default=1, help='Number of samples included in each data batch')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
-    parser.add_argument('--num_epochs', type=int, default=50, help='Maximum number of epochs to run for training')
+    parser.add_argument('--num_epochs', type=int, default=100, help='Maximum number of epochs to run for training')
+    parser.add_argument('--dropout_rate', type=float, default=0.5, help='Dropout (forget) rate')
+    parser.add_argument('--patience', type=int, default=10, help='Number of epochs to wait until early stopping')
 
     # -----------------
     # Data parameters
@@ -293,7 +295,7 @@ def collect_args():
     # -------------------
     parser.add_argument('--multi_gpu_backend', type=str, default='ddp', help='Backend to use for multi-GPU training')
     parser.add_argument('--num_gpus', type=int, default=-1, help='Number of GPUs to use (e.g. -1 = all available GPUs)')
-    parser.add_argument('--num_workers', type=int, default=6, help='Number of CPU threads for loading data')
+    parser.add_argument('--num_workers', type=int, default=8, help='Number of CPU threads for loading data')
     parser.add_argument('--profiler_method', type=str, default='simple', help='PyTorch Lightning profiler to use')
     parser.add_argument('--ckpt_dir', type=str, default=f'{os.path.join(os.getcwd(), "checkpoints")}',
                         help='Directory in which to save checkpoints')

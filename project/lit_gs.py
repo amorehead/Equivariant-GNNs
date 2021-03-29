@@ -1,16 +1,13 @@
 import os
 
 import pytorch_lightning as pl
-import torch
-import wandb
-from dgl.nn.pytorch import GraphConv
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from torch import softmax
-from torch.nn import Embedding, CrossEntropyLoss
+from torch.nn import ModuleList, ReLU, CrossEntropyLoss
 from torch.optim import Adam
 from torchmetrics import Accuracy
 
-from project.datasets.KarateClub.karate_club_dgl_data_module import KarateClubDGLDataModule
+from project.datasets.Cora.cora_dgl_data_module import CoraDGLDataModule
+from project.utils.modules import SAGEConv
 from project.utils.utils import collect_args, process_args, construct_wandb_pl_logger
 
 
@@ -34,30 +31,29 @@ class LitGraphSAGE(pl.LightningModule):
         # Assemble the layers of the network
         self.conv_block = self.build_gnn_model()
 
-        # Establish dataset variables
-        self.embed = Embedding(34, 5)  # 34 nodes with embedding dim equal to 5
-        self.labeled_nodes = torch.tensor([0, 33])  # Only the instructor and the president nodes are labeled
-        self.labels = torch.tensor([0, 1])  # Their labels are different
-
-        # Declare loss function for training, validation, and testing
+        # Declare loss function(s) for training, validation, and testing
         self.ce = CrossEntropyLoss()
         self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
+        self.test_acc = Accuracy()
 
     def build_gnn_model(self):
         """Define the layers of a LitGraphSAGE GNN."""
         # Marshal all GNN layers
-        self.conv1 = GraphConv(self.node_feat, self.hidden_dim)
-        self.conv2 = GraphConv(self.hidden_dim, self.num_classes)
+        conv_block = [SAGEConv(self.node_feat, self.hidden_dim), ReLU()]
+        for _ in range(self.num_hidden_layers):
+            conv_block.extend([SAGEConv(self.hidden_dim, self.hidden_dim), ReLU()])
+        conv_block.append(SAGEConv(self.hidden_dim, self.num_classes))
+        return ModuleList(conv_block)
 
     # ---------------------
     # Training
     # ---------------------
     def gnn_forward(self, graph, feats):
         """Make a forward pass through the entire network."""
-        logits = self.conv1(graph, feats)
-        logits = torch.relu(logits)
-        logits = self.conv2(graph, logits)
-        return logits
+        for i in range(len(self.conv_block)):
+            feats = self.conv_block[i](feats) if i % 2 == 1 else self.conv_block[i](graph, feats)
+        return feats
 
     def forward(self, graph, feats):
         """Make a forward pass through the entire network."""
@@ -69,27 +65,36 @@ class LitGraphSAGE(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """Lightning calls this inside the training loop."""
-        # Make a forward pass through the network for an entire batch of training graph pairs
         graph = batch
-        graph.ndata['feat'] = self.embed.weight
-        logits = self(graph, self.embed.weight)
-        self.labels = self.labels.to(self.device)
+        labels = graph.ndata['label']
+        train_mask = graph.ndata['train_mask']
+        val_mask = graph.ndata['val_mask']
+        test_mask = graph.ndata['test_mask']
+
+        # Make a forward pass through the network for an entire batch of training graph pairs
+        logits = self(graph, graph.ndata['feat'])
+
+        # Compute prediction
+        preds = logits.argmax(1)
 
         # Calculate the batch loss
-        class_probs = softmax(logits, 1).to(self.device)
-        loss = self.ce(class_probs[self.labeled_nodes], self.labels)  # Calculate CrossEntropyLoss of a single batch
-        self.train_acc(class_probs[self.labeled_nodes], self.labels)  # Calculate Accuracy of a single batch
+        loss = self.ce(logits[train_mask], labels[train_mask])  # Calculate CrossEntropyLoss of a single batch
 
         # Log training step metric(s)
         self.log('train_ce', loss, on_step=True, sync_dist=True)
-        self.log('train_acc', self.train_acc, on_step=True, sync_dist=True)
+        self.log('train_acc', self.train_acc(preds[train_mask], labels[train_mask]), on_step=True, sync_dist=True)
+        self.log('val_acc', self.val_acc(preds[val_mask], labels[val_mask]), on_step=True, sync_dist=True)
+        self.log('test_acc', self.test_acc(preds[test_mask], labels[test_mask]), on_step=True, sync_dist=True)
 
         return {'loss': loss}
 
-    def training_epoch_end(self, outs):
-        """Lightning calls this at the end of every training epoch."""
-        self.log('train_acc', self.train_acc.compute(), sync_dist=True)  # Log Accuracy of an epoch
+    def training_epoch_end(self, outputs):
+        self.log('train_acc', self.train_acc.compute(), sync_dist=True)
+        self.log('val_acc', self.val_acc.compute(), sync_dist=True)
+        self.log('test_acc', self.test_acc.compute(), sync_dist=True)
         self.train_acc.reset()
+        self.val_acc.reset()
+        self.test_acc.reset()
 
     # ---------------------
     # Training Setup
@@ -97,7 +102,7 @@ class LitGraphSAGE(pl.LightningModule):
     def configure_optimizers(self):
         """Called to configure the trainer's optimizer(s)."""
         optimizer = Adam(self.parameters(), lr=self.lr)
-        metric_to_track = 'train_ce'
+        metric_to_track = 'val_acc'
         return {
             'optimizer': optimizer,
             'monitor': metric_to_track
@@ -114,17 +119,17 @@ def cli_main():
     # -----------
     # Data
     # -----------
-    karate_club_data_module = KarateClubDGLDataModule(batch_size=1, num_dataloader_workers=args.num_workers)
-    karate_club_data_module.prepare_data()
-    karate_club_data_module.setup()
+    cora_data_module = CoraDGLDataModule(batch_size=args.batch_size, num_dataloader_workers=args.num_workers)
+    cora_data_module.prepare_data()
+    cora_data_module.setup()
 
     # ------------
     # Model
     # ------------
     lit_gs = LitGraphSAGE(
-        node_feat=karate_club_data_module.num_node_features,
+        node_feat=cora_data_module.num_node_features,
         hidden_dim=args.num_channels,
-        num_classes=karate_club_data_module.karate_club_dataset.num_classes,
+        num_classes=cora_data_module.cora_graph_dataset.num_classes,
         num_hidden_layers=args.num_layers,
         lr=args.lr,
         num_epochs=args.num_epochs)
@@ -147,7 +152,7 @@ def cli_main():
     # Checkpoint
     # ------------
     # Resume from checkpoint if path to a valid one is provided
-    args.ckpt_name = args.ckpt_name if args.ckpt_name is not None else 'LitGraphSAGE-{epoch:02d}-{train_ce:.2f}.ckpt'
+    args.ckpt_name = args.ckpt_name if args.ckpt_name is not None else 'LitGraphSAGE-{epoch:02d}-{val_acc:.2f}.ckpt'
     checkpoint_path = os.path.join(args.ckpt_dir, args.ckpt_name)
     trainer.resume_from_checkpoint = checkpoint_path if os.path.exists(checkpoint_path) else None
 
@@ -155,14 +160,14 @@ def cli_main():
     # Training
     # -----------
     # Create and use callbacks
-    early_stop_callback = EarlyStopping(monitor='train_ce', mode='min', min_delta=0.00, patience=10)
-    checkpoint_callback = ModelCheckpoint(monitor='train_ce', save_top_k=3, dirpath=args.ckpt_dir,
-                                          filename='LitGraphSAGE-{epoch:02d}-{train_ce:.2f}')
+    early_stop_callback = EarlyStopping(monitor='val_acc', mode='max', min_delta=0.00, patience=10)
+    checkpoint_callback = ModelCheckpoint(monitor='val_acc', save_top_k=3, dirpath=args.ckpt_dir,
+                                          filename='LitGraphSAGE-{epoch:02d}-{val_acc:.2f}')
     lr_callback = LearningRateMonitor(logging_interval='epoch')  # Use with a learning rate scheduler
     trainer.callbacks = [early_stop_callback, checkpoint_callback, lr_callback]
 
     # Train with the provided model and data module
-    trainer.fit(lit_gs, datamodule=karate_club_data_module)
+    trainer.fit(lit_gs, datamodule=cora_data_module)
 
     # -----------
     # Testing
