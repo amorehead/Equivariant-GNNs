@@ -95,9 +95,9 @@ class LitDAGNN(pl.LightningModule):
         return {'loss': loss}
 
     def training_epoch_end(self, outputs):
-        self.log('train_acc', self.train_acc.compute(), sync_dist=True)
-        self.log('val_acc', self.val_acc.compute(), sync_dist=True)
-        self.log('test_acc', self.test_acc.compute(), sync_dist=True)
+        self.log('train_acc', self.train_acc.compute())
+        self.log('val_acc', self.val_acc.compute())
+        self.log('test_acc', self.test_acc.compute())
         self.train_acc.reset()
         self.val_acc.reset()
         self.test_acc.reset()
