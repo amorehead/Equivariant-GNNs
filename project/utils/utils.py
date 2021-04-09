@@ -121,7 +121,6 @@ def shape_is(a, b, ignore_batch=1):
     return np.array_equal(shape_a, shape_b)
 
 
-# TODO: Investigate collation of graphs for correct loss calculation
 def collate(samples):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
@@ -331,7 +330,7 @@ def process_args(args):
 def construct_wandb_pl_logger(args):
     """Return an instance of WandbLogger with corresponding project and name strings."""
     return WandbLogger(name=args.experiment_name, project=args.project_name,
-                       entity=args.entity, offline=args.offline, log_model=True)
+                       entity=args.entity, offline=args.offline, log_model=False)
 
 
 def construct_neptune_pl_logger(args):
